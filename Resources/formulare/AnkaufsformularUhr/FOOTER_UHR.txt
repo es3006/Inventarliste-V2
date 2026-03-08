@@ -1,0 +1,60 @@
+      </table>
+
+
+<table>
+  <tr>
+    <td class="alLeft" style="width:50%">Zustand:</td>
+    <td class="alRight" style="width:50%">#ZUSTAND</td>
+  </tr>
+  <tr>
+    <td colspan="2"><hr></td>
+  </tr>
+  <tr>
+    <td class="alLeft" style="width:50%">Bezeichnung / Gewicht:</td>
+    <td class="alRight" style="width:50%">#ARTIKELNAME / #GEWICHT g</td>
+  </tr>
+  <tr>
+    <td class="alLeft" style="width:50%">Versand:</td>
+    <td class="alRight" style="width:50%">#VERSANDBETRAG €</td>
+  </tr>
+  <tr>
+    <td colspan="2"><hr></td>
+  </tr>
+  <tr>
+    <td class="alLeft" style="width:50%"><b>Gesamtbetrag:</b></td>
+    <td class="alRight" style="width:50%"><b>#GESAMTBETRAG €</b></td>
+  </tr>
+</table>
+
+           <hr>
+
+      <table class="alCenter medium">
+        <tr>
+          <td>Zahlungsart: (#ZAHLUNGSART)</td>
+        </tr>
+        <tr>
+          <td>
+            SKU: (#SKU)
+          </td>
+        </tr>
+        </table>
+
+        <div class="footer alCenter medium">
+        <table>
+        <tr>
+          <td>
+            Mit freundlichen Gr&uuml;&szlig;en<br><br>
+            #INHABERNAME
+          </td>
+        </tr>
+        <tr>
+          <td class="medium">
+            USt-IdNr: #FIRMAUSTID<br>
+            IBAN: #FIRMAIBAN
+          </td>
+        </tr>
+      </table>
+      </div>
+    </div>
+  </body>
+</html>

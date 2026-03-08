@@ -1,0 +1,184 @@
+﻿unit uEdelmetallsammelverkauf;
+
+interface
+
+uses
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
+  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.Mask, Vcl.ExtCtrls,
+  Vcl.ComCtrls, AdvListV, System.Generics.Collections, FireDAC.Stan.Param, FireDAC.Phys.SQLite,
+  Data.DB, FireDAC.Comp.DataSet, FireDAC.Comp.Client, FireDAC.Stan.Intf, FireDAC.DApt;
+
+type
+  TfEdelmetallsammelverkauf = class(TForm)
+    lvInventar: TAdvListView;
+    Label1: TLabel;
+    Label2: TLabel;
+    edRechnungsNr: TLabeledEdit;
+    btnSammelVerkauf: TButton;
+    edVerkaufswert: TLabeledEdit;
+    dtpVerkaufsdatum: TDateTimePicker;
+    Label3: TLabel;
+    edSummeEinkaufswert: TLabeledEdit;
+    procedure btnSammelVerkaufClick(Sender: TObject);
+    procedure FormShow(Sender: TObject);
+  private
+    FAnkaufIDs: TList<Integer>;
+  public
+    procedure SetAnkaufIDs(const AIDs: TList<Integer>);
+  end;
+
+var
+  fEdelmetallsammelverkauf: TfEdelmetallsammelverkauf;
+
+implementation
+
+{$R *.dfm}
+
+uses
+  uMoneyHelper, uSQLiteDateHelper, uMain;
+
+
+
+procedure TfEdelmetallsammelverkauf.FormShow(Sender: TObject);
+var
+  Q: TFDQuery;
+  SummeGesamtpreis: Int64;
+  i: Integer;
+  IDList: string;
+begin
+  // 1️Datum auf heute setzen
+  dtpVerkaufsdatum.Date := Date;
+
+  // 2️Summe der Gesamtpreise berechnen
+  if (FAnkaufIDs = nil) or (FAnkaufIDs.Count = 0) then
+  begin
+    edSummeEinkaufswert.Text := '0,00';
+    Exit;
+  end;
+
+  // IDs als CSV für IN-Klausel zusammenbauen
+  IDList := '';
+  for i := 0 to FAnkaufIDs.Count - 1 do
+  begin
+    if i > 0 then
+      IDList := IDList + ',';
+    IDList := IDList + FAnkaufIDs[i].ToString;
+  end;
+
+  Q := TFDQuery.Create(nil);
+  try
+    Q.Connection := fMain.FDConnection1;
+    Q.SQL.Text :=
+      'SELECT SUM(Gesamtpreis) AS Summe ' +
+      'FROM ankaufEdelmetall ' +
+      'WHERE id IN (' + IDList + ')';
+    Q.Open;
+
+    SummeGesamtpreis := Q.FieldByName('Summe').AsLargeInt;
+    Q.Close;
+
+    // Wert im Euro-Format anzeigen
+    edSummeEinkaufswert.Text := Int100ToDecimalString(SummeGesamtpreis);
+
+  finally
+    Q.Free;
+  end;
+end;
+
+
+
+
+
+
+
+procedure TfEdelmetallSammelverkauf.SetAnkaufIDs(const AIDs: TList<Integer>);
+begin
+  FAnkaufIDs := TList<Integer>.Create;
+  FAnkaufIDs.AddRange(AIDs);
+end;
+
+
+
+
+
+procedure TfEdelmetallsammelverkauf.btnSammelVerkaufClick(Sender: TObject);
+var
+  Q: TFDQuery;
+  i: Integer;
+  VerkaufswertGesamt: Int64;
+  Einkaufssumme: Int64;
+  VerkaufID: Int64;
+begin
+  if not IsValidDecimalString(edVerkaufswert.Text) then
+  begin
+    ShowMessage('Ungültiger Verkaufswert.');
+    Exit;
+  end;
+
+  VerkaufswertGesamt := DecimalStringToInt100(edVerkaufswert.Text);
+
+  fMain.FDConnection1.StartTransaction;
+  Q := TFDQuery.Create(nil);
+  try
+    Q.Connection := fMain.FDConnection1;
+
+    {-------------------------------------
+      1️Einkaufssumme berechnen
+    -------------------------------------}
+    Einkaufssumme := 0;
+    Q.SQL.Text := 'SELECT Ankaufswert FROM ankaufEdelmetall WHERE id = :ID';
+    for i := 0 to FAnkaufIDs.Count - 1 do
+    begin
+      Q.ParamByName('ID').AsInteger := FAnkaufIDs[i];
+      Q.Open;
+      Einkaufssumme := Einkaufssumme + Q.FieldByName('Ankaufswert').AsLargeInt;
+      Q.Close;
+    end;
+
+    {-------------------------------------
+      2️Sammelverkauf erzeugen
+    -------------------------------------}
+    Q.SQL.Text :=
+      'INSERT INTO verkaufEdelmetall ' +
+      '(RechnungsNr, Verkaufsdatum, Verkaufswert, Steuerbetrag) ' +
+      'VALUES (:Rechnung, :Datum, :Verkaufswert, 0)';
+
+    Q.ParamByName('Rechnung').AsString := edRechnungsNr.Text;
+    Q.ParamByName('Datum').AsString := DateTimeToSQLiteDate(dtpVerkaufsdatum.Date);
+    Q.ParamByName('Verkaufswert').AsLargeInt := VerkaufswertGesamt;
+
+    Q.ExecSQL;
+
+    {-------------------------------------
+      3️Neue VerkaufID holen (SQLite-sicher)
+    -------------------------------------}
+    VerkaufID := Q.Connection.ExecSQLScalar('SELECT last_insert_rowid()');
+
+    {-------------------------------------
+      4️Alle Ankäufe diesem Verkauf zuordnen
+    -------------------------------------}
+    Q.SQL.Text := 'UPDATE ankaufEdelmetall SET verkaufID = :VerkaufID WHERE id = :ID';
+    for i := 0 to FAnkaufIDs.Count - 1 do
+    begin
+      Q.ParamByName('VerkaufID').AsLargeInt := VerkaufID;
+      Q.ParamByName('ID').AsInteger := FAnkaufIDs[i];
+      Q.ExecSQL;
+    end;
+
+    fMain.FDConnection1.Commit;
+    ModalResult := mrOk;
+
+  except
+    fMain.FDConnection1.Rollback;
+    raise;
+  end;
+
+  Q.Free;
+end;
+
+
+
+
+
+
+end.

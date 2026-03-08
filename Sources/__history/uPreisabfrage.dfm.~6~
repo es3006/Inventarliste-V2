@@ -1,0 +1,613 @@
+object fPreisabfrage: TfPreisabfrage
+  Left = 0
+  Top = 0
+  BorderStyle = bsDialog
+  Caption = 'Preisabfrage'
+  ClientHeight = 452
+  ClientWidth = 731
+  Color = clBtnFace
+  Font.Charset = DEFAULT_CHARSET
+  Font.Color = clWindowText
+  Font.Height = -12
+  Font.Name = 'Segoe UI'
+  Font.Style = []
+  Position = poMainFormCenter
+  ShowInTaskBar = True
+  OnShow = FormShow
+  TextHeight = 15
+  object pnlHint: TPanel
+    Left = 0
+    Top = 0
+    Width = 731
+    Height = 72
+    Align = alTop
+    Color = 14680053
+    ParentBackground = False
+    ShowCaption = False
+    TabOrder = 0
+    ExplicitTop = 57
+    ExplicitWidth = 389
+    object Label4: TLabel
+      AlignWithMargins = True
+      Left = 11
+      Top = 11
+      Width = 709
+      Height = 50
+      Margins.Left = 10
+      Margins.Top = 10
+      Margins.Right = 10
+      Margins.Bottom = 10
+      Align = alClient
+      Caption = 
+        'W'#228'hlen Sie hier die Einheiten, die ein Kunde kaufen will, '#13'um de' +
+        'n h'#246'chsten Einkaufspreis der gew'#228'hlten Einheit '#13'zu ermitteln.'
+      WordWrap = True
+      ExplicitWidth = 296
+      ExplicitHeight = 45
+    end
+  end
+  object Panel3: TPanel
+    Left = 0
+    Top = 72
+    Width = 731
+    Height = 380
+    Align = alClient
+    BevelOuter = bvNone
+    ShowCaption = False
+    TabOrder = 1
+    ExplicitWidth = 834
+    object pnlEinheit: TPanel
+      Left = 0
+      Top = 0
+      Width = 460
+      Height = 380
+      Align = alLeft
+      BevelOuter = bvNone
+      TabOrder = 0
+      object Label1: TLabel
+        Left = 24
+        Top = 15
+        Width = 36
+        Height = 15
+        Caption = 'Einheit'
+      end
+      object lbEinkaufspreis: TLabel
+        Left = 130
+        Top = 15
+        Width = 100
+        Height = 31
+        AutoSize = False
+        Caption = 'Einkaufspreis (h'#246'chster)'
+        WordWrap = True
+      end
+      object cbEinheit1: TComboBox
+        Left = 24
+        Top = 52
+        Width = 100
+        Height = 23
+        Style = csDropDownList
+        DropDownCount = 15
+        TabOrder = 0
+        OnSelect = cbEinheit1Select
+      end
+      object cbEinheit2: TComboBox
+        Left = 24
+        Top = 81
+        Width = 100
+        Height = 23
+        Style = csDropDownList
+        DropDownCount = 15
+        TabOrder = 1
+        OnSelect = cbEinheit1Select
+      end
+      object cbEinheit3: TComboBox
+        Left = 24
+        Top = 110
+        Width = 100
+        Height = 23
+        Style = csDropDownList
+        DropDownCount = 15
+        TabOrder = 2
+        OnSelect = cbEinheit1Select
+      end
+      object cbEinheit4: TComboBox
+        Left = 24
+        Top = 139
+        Width = 100
+        Height = 23
+        Style = csDropDownList
+        DropDownCount = 15
+        TabOrder = 3
+        OnSelect = cbEinheit1Select
+      end
+      object cbEinheit5: TComboBox
+        Left = 24
+        Top = 168
+        Width = 100
+        Height = 23
+        Style = csDropDownList
+        DropDownCount = 15
+        TabOrder = 4
+        OnSelect = cbEinheit1Select
+      end
+      object cbEinheit6: TComboBox
+        Left = 24
+        Top = 197
+        Width = 100
+        Height = 23
+        Style = csDropDownList
+        DropDownCount = 15
+        TabOrder = 5
+        OnSelect = cbEinheit1Select
+      end
+      object cbEinheit7: TComboBox
+        Left = 24
+        Top = 226
+        Width = 100
+        Height = 23
+        Style = csDropDownList
+        DropDownCount = 15
+        TabOrder = 6
+        OnSelect = cbEinheit1Select
+      end
+      object cbEinheit8: TComboBox
+        Left = 24
+        Top = 255
+        Width = 100
+        Height = 23
+        Style = csDropDownList
+        DropDownCount = 15
+        TabOrder = 7
+        OnSelect = cbEinheit1Select
+      end
+      object cbEinheit9: TComboBox
+        Left = 24
+        Top = 284
+        Width = 100
+        Height = 23
+        Style = csDropDownList
+        DropDownCount = 15
+        TabOrder = 8
+        OnSelect = cbEinheit1Select
+      end
+      object cbEinheit10: TComboBox
+        Left = 24
+        Top = 313
+        Width = 100
+        Height = 23
+        Style = csDropDownList
+        DropDownCount = 15
+        TabOrder = 9
+        OnSelect = cbEinheit1Select
+      end
+      object edEKPreis1: TEdit
+        Left = 130
+        Top = 52
+        Width = 100
+        Height = 23
+        ReadOnly = True
+        TabOrder = 10
+        OnChange = edEKPreis1Change
+      end
+      object edEKPreis2: TEdit
+        Left = 130
+        Top = 81
+        Width = 100
+        Height = 23
+        ReadOnly = True
+        TabOrder = 11
+        OnChange = edEKPreis1Change
+      end
+      object edEKPreis3: TEdit
+        Left = 130
+        Top = 110
+        Width = 100
+        Height = 23
+        ReadOnly = True
+        TabOrder = 12
+        OnChange = edEKPreis1Change
+      end
+      object edEKPreis4: TEdit
+        Left = 130
+        Top = 139
+        Width = 100
+        Height = 23
+        ReadOnly = True
+        TabOrder = 13
+        OnChange = edEKPreis1Change
+      end
+      object edEKPreis5: TEdit
+        Left = 130
+        Top = 168
+        Width = 100
+        Height = 23
+        ReadOnly = True
+        TabOrder = 14
+        OnChange = edEKPreis1Change
+      end
+      object edEKPreis6: TEdit
+        Left = 130
+        Top = 197
+        Width = 100
+        Height = 23
+        ReadOnly = True
+        TabOrder = 15
+        OnChange = edEKPreis1Change
+      end
+      object edEKPreis7: TEdit
+        Left = 130
+        Top = 226
+        Width = 100
+        Height = 23
+        ReadOnly = True
+        TabOrder = 16
+        OnChange = edEKPreis1Change
+      end
+      object edEKPreis8: TEdit
+        Left = 130
+        Top = 255
+        Width = 100
+        Height = 23
+        ReadOnly = True
+        TabOrder = 17
+        OnChange = edEKPreis1Change
+      end
+      object edEKPreis9: TEdit
+        Left = 130
+        Top = 284
+        Width = 100
+        Height = 23
+        ReadOnly = True
+        TabOrder = 18
+        OnChange = edEKPreis1Change
+      end
+      object edEKPreis10: TEdit
+        Left = 130
+        Top = 313
+        Width = 100
+        Height = 23
+        ReadOnly = True
+        TabOrder = 19
+        OnChange = edEKPreis1Change
+      end
+      object cbVerkauf: TCheckBox
+        Left = 24
+        Top = 351
+        Width = 310
+        Height = 17
+        Caption = 'Gew'#228'hlte Einheiten verkaufen'
+        TabOrder = 20
+        OnClick = cbVerkaufClick
+      end
+      object pnlVerkaufspreis: TPanel
+        Left = 235
+        Top = 0
+        Width = 225
+        Height = 380
+        Align = alRight
+        BevelOuter = bvNone
+        ShowCaption = False
+        TabOrder = 21
+        Visible = False
+        ExplicitLeft = 248
+        DesignSize = (
+          225
+          380)
+        object Label6: TLabel
+          Left = 7
+          Top = 15
+          Width = 69
+          Height = 30
+          Anchors = [akTop, akRight]
+          Caption = 'Verkaufspreis in EUR'
+          WordWrap = True
+          ExplicitLeft = 58
+        end
+        object Label2: TLabel
+          Left = 113
+          Top = 15
+          Width = 89
+          Height = 30
+          Anchors = [akTop, akRight]
+          Caption = 'Zu besteuernder Betrag in EUR'
+          WordWrap = True
+          ExplicitLeft = 164
+        end
+        object edVerkaufspreis1: TEdit
+          Left = 5
+          Top = 52
+          Width = 100
+          Height = 23
+          Anchors = [akTop, akRight]
+          TabOrder = 0
+          OnExit = edVerkaufspreis1Exit
+          OnKeyPress = edVerkaufspreis1KeyPress
+          ExplicitLeft = 56
+        end
+        object edVerkaufspreis2: TEdit
+          Left = 5
+          Top = 81
+          Width = 100
+          Height = 23
+          Anchors = [akTop, akRight]
+          TabOrder = 1
+          OnExit = edVerkaufspreis1Exit
+          OnKeyPress = edVerkaufspreis1KeyPress
+          ExplicitLeft = 56
+        end
+        object edVerkaufspreis3: TEdit
+          Left = 5
+          Top = 110
+          Width = 100
+          Height = 23
+          Anchors = [akTop, akRight]
+          TabOrder = 2
+          OnExit = edVerkaufspreis1Exit
+          OnKeyPress = edVerkaufspreis1KeyPress
+          ExplicitLeft = 56
+        end
+        object edVerkaufspreis4: TEdit
+          Left = 5
+          Top = 139
+          Width = 100
+          Height = 23
+          Anchors = [akTop, akRight]
+          TabOrder = 3
+          OnExit = edVerkaufspreis1Exit
+          OnKeyPress = edVerkaufspreis1KeyPress
+          ExplicitLeft = 56
+        end
+        object edVerkaufspreis5: TEdit
+          Left = 5
+          Top = 168
+          Width = 100
+          Height = 23
+          Anchors = [akTop, akRight]
+          TabOrder = 4
+          OnExit = edVerkaufspreis1Exit
+          OnKeyPress = edVerkaufspreis1KeyPress
+          ExplicitLeft = 56
+        end
+        object edVerkaufspreis6: TEdit
+          Left = 5
+          Top = 197
+          Width = 100
+          Height = 23
+          Anchors = [akTop, akRight]
+          TabOrder = 5
+          OnExit = edVerkaufspreis1Exit
+          OnKeyPress = edVerkaufspreis1KeyPress
+          ExplicitLeft = 56
+        end
+        object edVerkaufspreis7: TEdit
+          Left = 5
+          Top = 226
+          Width = 100
+          Height = 23
+          Anchors = [akTop, akRight]
+          TabOrder = 6
+          OnExit = edVerkaufspreis1Exit
+          OnKeyPress = edVerkaufspreis1KeyPress
+          ExplicitLeft = 56
+        end
+        object edVerkaufspreis8: TEdit
+          Left = 5
+          Top = 255
+          Width = 100
+          Height = 23
+          Anchors = [akTop, akRight]
+          TabOrder = 7
+          OnExit = edVerkaufspreis1Exit
+          OnKeyPress = edVerkaufspreis1KeyPress
+          ExplicitLeft = 56
+        end
+        object edVerkaufspreis9: TEdit
+          Left = 5
+          Top = 284
+          Width = 100
+          Height = 23
+          Anchors = [akTop, akRight]
+          TabOrder = 8
+          OnExit = edVerkaufspreis1Exit
+          OnKeyPress = edVerkaufspreis1KeyPress
+          ExplicitLeft = 56
+        end
+        object edVerkaufspreis10: TEdit
+          Left = 5
+          Top = 313
+          Width = 100
+          Height = 23
+          Anchors = [akTop, akRight]
+          TabOrder = 9
+          OnExit = edVerkaufspreis1Exit
+          OnKeyPress = edVerkaufspreis1KeyPress
+          ExplicitLeft = 56
+        end
+        object edBesteuernderBetrag1: TEdit
+          Left = 111
+          Top = 52
+          Width = 100
+          Height = 23
+          Anchors = [akTop, akRight]
+          ReadOnly = True
+          TabOrder = 10
+          ExplicitLeft = 162
+        end
+        object edBesteuernderBetrag2: TEdit
+          Left = 111
+          Top = 81
+          Width = 100
+          Height = 23
+          Anchors = [akTop, akRight]
+          ReadOnly = True
+          TabOrder = 11
+          ExplicitLeft = 162
+        end
+        object edBesteuernderBetrag3: TEdit
+          Left = 111
+          Top = 110
+          Width = 100
+          Height = 23
+          Anchors = [akTop, akRight]
+          ReadOnly = True
+          TabOrder = 12
+          ExplicitLeft = 162
+        end
+        object edBesteuernderBetrag4: TEdit
+          Left = 111
+          Top = 139
+          Width = 100
+          Height = 23
+          Anchors = [akTop, akRight]
+          ReadOnly = True
+          TabOrder = 13
+          ExplicitLeft = 162
+        end
+        object edBesteuernderBetrag5: TEdit
+          Left = 111
+          Top = 168
+          Width = 100
+          Height = 23
+          Anchors = [akTop, akRight]
+          ReadOnly = True
+          TabOrder = 14
+          ExplicitLeft = 162
+        end
+        object edBesteuernderBetrag6: TEdit
+          Left = 111
+          Top = 197
+          Width = 100
+          Height = 23
+          Anchors = [akTop, akRight]
+          ReadOnly = True
+          TabOrder = 15
+          ExplicitLeft = 162
+        end
+        object edBesteuernderBetrag7: TEdit
+          Left = 111
+          Top = 226
+          Width = 100
+          Height = 23
+          Anchors = [akTop, akRight]
+          ReadOnly = True
+          TabOrder = 16
+          ExplicitLeft = 162
+        end
+        object edBesteuernderBetrag8: TEdit
+          Left = 111
+          Top = 255
+          Width = 100
+          Height = 23
+          Anchors = [akTop, akRight]
+          ReadOnly = True
+          TabOrder = 17
+          ExplicitLeft = 162
+        end
+        object edBesteuernderBetrag10: TEdit
+          Left = 111
+          Top = 313
+          Width = 100
+          Height = 23
+          Anchors = [akTop, akRight]
+          ReadOnly = True
+          TabOrder = 18
+          ExplicitLeft = 162
+        end
+        object edBesteuernderBetrag9: TEdit
+          Left = 111
+          Top = 284
+          Width = 100
+          Height = 23
+          Anchors = [akTop, akRight]
+          ReadOnly = True
+          TabOrder = 19
+          ExplicitLeft = 162
+        end
+      end
+    end
+    object pnlVerkauf: TPanel
+      Left = 460
+      Top = 0
+      Width = 271
+      Height = 380
+      Align = alClient
+      BevelOuter = bvNone
+      TabOrder = 1
+      Visible = False
+      ExplicitLeft = 361
+      ExplicitWidth = 473
+      object Label3: TLabel
+        Left = 22
+        Top = 89
+        Width = 80
+        Height = 15
+        Caption = 'Verkaufsdatum'
+        Font.Charset = ANSI_CHARSET
+        Font.Color = clWindowText
+        Font.Height = -12
+        Font.Name = 'Segoe UI Semibold'
+        Font.Style = [fsBold]
+        ParentFont = False
+      end
+      object Bevel1: TBevel
+        Left = 0
+        Top = 0
+        Width = 16
+        Height = 380
+        Align = alLeft
+        Shape = bsLeftLine
+        ExplicitHeight = 362
+      end
+      object btnSelSelectedUnits: TButton
+        Left = 62
+        Top = 313
+        Width = 195
+        Height = 25
+        Caption = 'Gew'#228'hlte Einheiten verkaufen'
+        TabOrder = 0
+        OnClick = btnSelSelectedUnitsClick
+      end
+      object edRechnungsNr: TLabeledEdit
+        Left = 22
+        Top = 52
+        Width = 113
+        Height = 23
+        AutoSelect = False
+        EditLabel.Width = 72
+        EditLabel.Height = 15
+        EditLabel.Caption = 'RechnungsNr'
+        EditLabel.Font.Charset = ANSI_CHARSET
+        EditLabel.Font.Color = clWindowText
+        EditLabel.Font.Height = -12
+        EditLabel.Font.Name = 'Segoe UI Semibold'
+        EditLabel.Font.Style = [fsBold]
+        EditLabel.ParentFont = False
+        NumbersOnly = True
+        TabOrder = 1
+        Text = ''
+      end
+      object dtpVerkaufsdatum: TDateTimePicker
+        Left = 22
+        Top = 110
+        Width = 113
+        Height = 23
+        Date = 46025.000000000000000000
+        Time = 0.918865486113645600
+        ShowCheckbox = True
+        Checked = False
+        TabOrder = 2
+      end
+      object edVerkaufBemerkung: TLabeledEdit
+        Left = 22
+        Top = 168
+        Width = 235
+        Height = 23
+        EditLabel.Width = 74
+        EditLabel.Height = 15
+        EditLabel.Caption = 'Bemerkungen'
+        TabOrder = 3
+        Text = ''
+      end
+    end
+  end
+end

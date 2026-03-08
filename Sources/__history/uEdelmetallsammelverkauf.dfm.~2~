@@ -1,0 +1,180 @@
+object fEdelmetallsammelverkauf: TfEdelmetallsammelverkauf
+  Left = 0
+  Top = 0
+  Caption = 'Edelmetall Sammelverkauf'
+  ClientHeight = 441
+  ClientWidth = 624
+  Color = clBtnFace
+  Font.Charset = DEFAULT_CHARSET
+  Font.Color = clWindowText
+  Font.Height = -12
+  Font.Name = 'Segoe UI'
+  Font.Style = []
+  TextHeight = 15
+  object Label1: TLabel
+    Left = 8
+    Top = 16
+    Width = 83
+    Height = 15
+    Caption = 'Kundenank'#228'ufe'
+  end
+  object Label2: TLabel
+    Left = 8
+    Top = 296
+    Width = 140
+    Height = 15
+    Caption = 'Edelmetall Sammelverkauf'
+  end
+  object lvInventar: TAdvListView
+    Left = 8
+    Top = 40
+    Width = 608
+    Height = 241
+    Columns = <
+      item
+        Caption = 'ID'
+        MaxWidth = 1
+        Tag = 1
+        Width = 0
+      end
+      item
+        Alignment = taCenter
+        Caption = 'Kaufdatum'
+        MaxWidth = 100
+        MinWidth = 100
+        Tag = 3
+        Width = 100
+      end
+      item
+        Alignment = taCenter
+        Caption = 'SKU'
+        MaxWidth = 100
+        MinWidth = 100
+        Width = 100
+      end
+      item
+        Alignment = taCenter
+        Caption = 'Einheit'
+        Width = 60
+      end
+      item
+        Alignment = taRightJustify
+        Caption = 'Einkaufswert'
+        MaxWidth = 100
+        MinWidth = 100
+        Tag = 2
+        Width = 100
+      end
+      item
+        AutoSize = True
+        Caption = 'Bemerkungen'
+        MinWidth = 100
+        WidthType = (
+          -276)
+      end
+      item
+        Alignment = taCenter
+        Caption = 'Verkaufsdatum'
+        MinWidth = 120
+        Tag = 3
+        Width = 120
+      end
+      item
+        Alignment = taRightJustify
+        Caption = 'Verkaufswert'
+        MinWidth = 100
+        Tag = 2
+        Width = 100
+      end
+      item
+        Caption = 'Bemerkungen'
+        MinWidth = 100
+        Width = 100
+      end
+      item
+        Alignment = taRightJustify
+        Caption = 'zu besteuern'
+        MinWidth = 100
+        Tag = 2
+        Width = 100
+      end
+      item
+        Alignment = taCenter
+        Caption = 'RechnungsNr'
+        MinWidth = 100
+        Tag = 1
+        Width = 100
+      end
+      item
+        Caption = 'AnkaufformularID'
+        MaxWidth = 1
+        Width = 0
+      end>
+    DoubleBuffered = True
+    GridLines = True
+    HideSelection = False
+    OwnerDraw = True
+    ReadOnly = True
+    RowSelect = True
+    ParentDoubleBuffered = False
+    ParentShowHint = False
+    ShowHint = False
+    TabOrder = 0
+    ViewStyle = vsReport
+    AutoHint = True
+    FilterTimeOut = 0
+    PrintSettings.DateFormat = 'dd/mm/yyyy'
+    PrintSettings.Font.Charset = DEFAULT_CHARSET
+    PrintSettings.Font.Color = clWindowText
+    PrintSettings.Font.Height = -12
+    PrintSettings.Font.Name = 'Segoe UI'
+    PrintSettings.Font.Style = []
+    PrintSettings.HeaderFont.Charset = DEFAULT_CHARSET
+    PrintSettings.HeaderFont.Color = clWindowText
+    PrintSettings.HeaderFont.Height = -12
+    PrintSettings.HeaderFont.Name = 'Segoe UI'
+    PrintSettings.HeaderFont.Style = []
+    PrintSettings.FooterFont.Charset = DEFAULT_CHARSET
+    PrintSettings.FooterFont.Color = clWindowText
+    PrintSettings.FooterFont.Height = -12
+    PrintSettings.FooterFont.Name = 'Segoe UI'
+    PrintSettings.FooterFont.Style = []
+    PrintSettings.PageNumSep = '/'
+    HeaderFont.Charset = DEFAULT_CHARSET
+    HeaderFont.Color = clWindowText
+    HeaderFont.Height = -11
+    HeaderFont.Name = 'Segoe UI'
+    HeaderFont.Style = []
+    ProgressSettings.ValueFormat = '%d%%'
+    SubItemSelect = True
+    ItemHeight = 30
+    DetailView.Font.Charset = DEFAULT_CHARSET
+    DetailView.Font.Color = clBlue
+    DetailView.Font.Height = -12
+    DetailView.Font.Name = 'Segoe UI'
+    DetailView.Font.Style = []
+    Version = '1.9.1.1'
+  end
+  object edRechnungsNr: TLabeledEdit
+    Left = 8
+    Top = 336
+    Width = 121
+    Height = 23
+    EditLabel.Width = 85
+    EditLabel.Height = 15
+    EditLabel.Caption = 'edRechnungsNr'
+    TabOrder = 1
+    Text = ''
+  end
+  object edGesEinkaufswert: TLabeledEdit
+    Left = 160
+    Top = 336
+    Width = 121
+    Height = 23
+    EditLabel.Width = 85
+    EditLabel.Height = 15
+    EditLabel.Caption = 'edRechnungsNr'
+    TabOrder = 2
+    Text = ''
+  end
+end

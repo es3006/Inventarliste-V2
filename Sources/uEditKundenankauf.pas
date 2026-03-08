@@ -1,0 +1,480 @@
+﻿unit uEditKundenankauf;
+
+interface
+
+uses
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
+  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.Imaging.pngimage, Vcl.ExtCtrls,
+  Vcl.StdCtrls, Vcl.ComCtrls, Vcl.Mask, AdvPageControl, StrUtils,
+  FireDAC.Stan.Param, FireDAC.Phys.SQLite, Data.DB, FireDAC.Comp.DataSet, FireDAC.Comp.Client, System.Generics.Defaults,
+  FireDAC.Stan.Intf, FireDAC.DApt, DateUtils, Vcl.Buttons, ShellApi;
+
+
+
+type
+  TfEditKundenankauf = class(TForm)
+    Label2: TLabel;
+    Panel1: TPanel;
+    Label7: TLabel;
+    imgTaschenrechner: TImage;
+    pnlUhr: TPanel;
+    edMarke: TLabeledEdit;
+    edModel: TLabeledEdit;
+    edJahr: TLabeledEdit;
+    cbBox: TCheckBox;
+    cbPapiere: TCheckBox;
+    cbZustand: TComboBox;
+    Label9: TLabel;
+    pnlAnkaufDefault: TPanel;
+    edReferenz: TLabeledEdit;
+    dtpAnkaufsdatum: TDateTimePicker;
+    Label1: TLabel;
+    edSKU: TLabeledEdit;
+    pnlAnkaufsdaten: TPanel;
+    edBezeichnung: TLabeledEdit;
+    edGewicht: TLabeledEdit;
+    edKarat: TLabeledEdit;
+    cbZahlungsarten: TComboBox;
+    Label10: TLabel;
+    edAnkaufspreis: TLabeledEdit;
+    edVersand: TLabeledEdit;
+    edGesamtbetrag: TLabeledEdit;
+    pnlButtons: TPanel;
+    btnAbort: TButton;
+    btnSave: TButton;
+    procedure btnAbortClick(Sender: TObject);
+    procedure btnSaveClick(Sender: TObject);
+    procedure FormShow(Sender: TObject);
+    procedure edAnkaufspreisChange(Sender: TObject);
+    procedure edAnkaufspreisKeyPress(Sender: TObject; var Key: Char);
+    procedure edVersandKeyPress(Sender: TObject; var Key: Char);
+    procedure imgTaschenrechnerClick(Sender: TObject);
+    procedure FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
+    procedure edGewichtExit(Sender: TObject);
+  private
+    procedure UpdateKundenankaufInDB(const AConnection: TFDConnection);
+    procedure ShowKundenankaufEntryFromDB(const AConnection: TFDConnection);
+   // procedure CreateAnkaufsformularAsPDF;
+  public
+    ENTRYID: integer;
+  end;
+
+var
+  fEditKundenankauf: TfEditKundenankauf;
+  ENTRYID: integer;
+  UHR: boolean;
+
+implementation
+
+{$R *.dfm}
+
+uses
+  uMain, uFunctions, uDBFunctions, uMoneyHelper, uSQLiteDateHelper;
+
+
+
+procedure TfEditKundenankauf.btnAbortClick(Sender: TObject);
+begin
+  close;
+end;
+
+procedure TfEditKundenankauf.btnSaveClick(Sender: TObject);
+begin
+  UpdateKundenankaufInDB(fMain.FDConnection1);
+end;
+
+
+
+
+
+procedure TfEditKundenankauf.edAnkaufspreisChange(Sender: TObject);
+var
+  Kaufpreis, Versand, Gesamt: Double;
+  sKaufpreis, sVersand: string;
+begin
+  // Werte aus den Edit-Feldern auslesen
+  Kaufpreis := StrToFloatDef(Trim(edAnkaufspreis.Text), 0);
+  Versand   := StrToFloatDef(Trim(edVersand.Text), 0);
+
+  // Summe berechnen
+  Gesamt := Kaufpreis + Versand;
+
+  // Ergebnis anzeigen
+  edGesamtbetrag.Text := FormatFloat('0.00', Gesamt);
+end;
+
+
+
+
+
+
+procedure TfEditKundenankauf.edAnkaufspreisKeyPress(Sender: TObject; var Key: Char);
+begin
+// Ziffern erlauben
+  if CharInSet(Key, ['0'..'9']) then
+    Exit;
+
+  // Komma erlauben (nur einmal)
+  if (Key = ',') and (Pos(',', (Sender as TLabeledEdit).Text) = 0) then
+    Exit;
+
+  // Backspace erlauben
+  if Key = #8 then
+    Exit;
+
+  // Enter erlauben
+  if Key = #13 then
+    Exit;
+
+  if Key = '.' then
+  begin
+    Key := ',';
+    if Pos(',', (Sender as TLabeledEdit).Text) > 0 then
+      Key := #0;
+    Exit;
+  end;
+
+  if (Key = '-') and ((Sender as TLabeledEdit).SelStart = 0)
+   and (Pos('-', (Sender as TLabeledEdit).Text) = 0) then
+  Exit;
+
+  // Alles andere blockieren
+  Key := #0;
+end;
+
+
+
+
+
+
+procedure TfEditKundenankauf.edGewichtExit(Sender: TObject);
+var
+  d: Double;
+  FS: TFormatSettings;
+  Edit: TLabeledEdit;
+begin
+  if not (Sender is TLabeledEdit) then
+    Exit;
+
+  Edit := TLabeledEdit(Sender);
+
+  if Trim(Edit.Text) = '' then
+    Exit;
+
+  FS := TFormatSettings.Create;
+  FS.DecimalSeparator := ',';
+
+  if TryStrToFloat(Trim(Edit.Text), d, FS) then
+    Edit.Text := FormatFloat('0.00', d, FS)
+  else
+  begin
+    ShowMessage('Bitte geben Sie einen gültigen Wert ein.');
+    Edit.SetFocus;
+    Edit.SelectAll;
+  end;
+end;
+
+
+
+procedure TfEditKundenankauf.edVersandKeyPress(Sender: TObject; var Key: Char);
+begin
+// Ziffern erlauben
+  if CharInSet(Key, ['0'..'9']) then
+    Exit;
+
+  // Komma erlauben (nur einmal)
+  if (Key = ',') and (Pos(',', (Sender as TLabeledEdit).Text) = 0) then
+    Exit;
+
+  // Backspace erlauben
+  if Key = #8 then
+    Exit;
+
+  // Enter erlauben
+  if Key = #13 then
+    Exit;
+
+  if Key = '.' then
+  begin
+    Key := ',';
+    if Pos(',', (Sender as TLabeledEdit).Text) > 0 then
+      Key := #0;
+    Exit;
+  end;
+
+  if (Key = '-') and ((Sender as TLabeledEdit).SelStart = 0)
+   and (Pos('-', (Sender as TLabeledEdit).Text) = 0) then
+  Exit;
+
+  // Alles andere blockieren
+  Key := #0;
+end;
+
+
+
+
+
+procedure TfEditKundenankauf.FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
+begin
+  if Key = VK_ESCAPE then
+  begin
+    Key := 0;
+    Close;
+  end;
+end;
+
+procedure TfEditKundenankauf.FormShow(Sender: TObject);
+begin
+  LoadZustaendeFromDB(fMain.FDConnection1, cbZustand);
+  LoadZahlungsartenFromDB(fMain.FDConnection1, cbZahlungsarten);
+
+  ShowKundenankaufEntryFromDB(fMain.FDConnection1);
+end;
+
+
+
+
+
+procedure TfEditKundenankauf.imgTaschenrechnerClick(Sender: TObject);
+begin
+  OpenCalculator;
+end;
+
+
+
+
+
+procedure TfEditKundenankauf.UpdateKundenankaufInDB(const AConnection: TFDConnection);
+var
+  FDQuery: TFDQuery;
+  ankaufspreis, versandpreis: Int64;
+  sku, ref, marke, model, bezeichnung, zustand, zahlungsart: string;
+  gewichtInt: Integer;
+  karat, jahr: Integer;
+  box, papiere: Integer;
+begin
+  // ===== Validierung =====
+  if Trim(edAnkaufspreis.Text) = '' then
+  begin
+    ShowMessage('Bitte geben Sie den Ankaufspreis ein!');
+    edAnkaufspreis.SetFocus;
+    Exit;
+  end;
+
+  // Validierung: Ankaufspreis muss gültiges Dezimalformat haben
+  if not IsValidDecimalString(edAnkaufspreis.Text) then
+  begin
+    ShowMessage('Ungültiger Ankaufspreis! Bitte verwenden Sie das Format: 123,45');
+    edAnkaufspreis.SetFocus;
+    Exit;
+  end;
+
+  // Validierung: Versandpreis falls vorhanden
+  if (Trim(edVersand.Text) <> '') and not IsValidDecimalString(edVersand.Text) then
+  begin
+    ShowMessage('Ungültiger Versandpreis! Bitte verwenden Sie das Format: 12,50');
+    edVersand.SetFocus;
+    Exit;
+  end;
+
+  // Validierung: Gewicht falls vorhanden
+  if (Trim(edGewicht.Text) <> '') and not IsValidDecimalString(edGewicht.Text) then
+  begin
+    ShowMessage('Ungültiges Gewicht! Bitte verwenden Sie das Format: 45,67');
+    edGewicht.SetFocus;
+    Exit;
+  end;
+
+  if UHR and (Trim(edJahr.Text) = '') then
+  begin
+    ShowMessage('Bitte geben Sie das Herstellungsjahr des Artikels ein!');
+    edJahr.SetFocus;
+    Exit;
+  end;
+
+  // ===== UI-Werte mit Helper-Funktionen =====
+  ref          := Trim(edReferenz.Text);
+  bezeichnung  := Trim(edBezeichnung.Text);
+  ankaufspreis := DecimalStringToInt100(edAnkaufspreis.Text);
+  versandpreis := DecimalStringToInt100(edVersand.Text);
+  zahlungsart  := cbZahlungsarten.Text;
+
+  // Gewicht: einheitlich mit DecimalStringToInt100
+  gewichtInt := DecimalStringToInt100(edGewicht.Text);
+
+  if not TryStrToInt(Trim(edKarat.Text), karat) then
+    karat := 0;
+
+  if UHR then
+  begin
+    box     := Ord(cbBox.Checked);
+    papiere := Ord(cbPapiere.Checked);
+    marke   := Trim(edMarke.Text);
+    model   := Trim(edModel.Text);
+    jahr    := StrToIntDef(Trim(edJahr.Text), 0);
+    zustand := cbZustand.Text;
+  end;
+
+  // ===== Datenbank =====
+  FDQuery := TFDQuery.Create(nil);
+  try
+    FDQuery.Connection := AConnection;
+
+    if UHR then
+      FDQuery.SQL.Text :=
+        'UPDATE inventar SET ' +
+        'Einkaufsdatum = :EINKAUFSDATUM, ' +
+        'Einkaufswert = :KAUFPREIS, ' +
+        'EinkaufBemerkung = :BEZEICHNUNG, ' +
+        'Gewicht = :GEWICHT, ' +
+        'Karat = :KARAT, ' +
+        'Ref = :REF, ' +
+        'Box = :BOX, ' +
+        'Papiere = :PAPIERE, ' +
+        'Marke = :MARKE, ' +
+        'Model = :MODEL, ' +
+        'Jahr = :JAHR, ' +
+        'Zustand = :ZUSTAND, ' +
+        'Versand = :VERSAND, ' +
+        'Zahlungsart = :ZAHLUNGSART ' +
+        'WHERE id = :ID'
+    else
+      FDQuery.SQL.Text :=
+        'UPDATE inventar SET ' +
+        'Einkaufsdatum = :EINKAUFSDATUM, ' +
+        'Einkaufswert = :KAUFPREIS, ' +
+        'EinkaufBemerkung = :BEZEICHNUNG, ' +
+        'Gewicht = :GEWICHT, ' +
+        'Karat = :KARAT, ' +
+        'Ref = :REF, ' +
+        'Versand = :VERSAND, ' +
+        'Zahlungsart = :ZAHLUNGSART ' +
+        'WHERE id = :ID';
+
+    AConnection.StartTransaction;
+    try
+      FDQuery.ParamByName('ID').AsInteger := ENTRYID;
+
+      // Datum ausschließlich über Helper
+      SetSQLiteDateParam(
+        FDQuery.ParamByName('EINKAUFSDATUM'),
+        dtpAnkaufsdatum
+      );
+
+      // Gemeinsame Parameter
+      FDQuery.ParamByName('KAUFPREIS').AsLargeInt := ankaufspreis;
+      FDQuery.ParamByName('BEZEICHNUNG').AsString := bezeichnung;
+      FDQuery.ParamByName('GEWICHT').AsInteger    := gewichtInt;
+      FDQuery.ParamByName('KARAT').AsInteger      := karat;
+      FDQuery.ParamByName('REF').AsString         := ref;
+      FDQuery.ParamByName('VERSAND').AsLargeInt   := versandpreis;
+      FDQuery.ParamByName('ZAHLUNGSART').AsString := zahlungsart;
+
+      if UHR then
+      begin
+        FDQuery.ParamByName('BOX').AsInteger     := box;
+        FDQuery.ParamByName('PAPIERE').AsInteger := papiere;
+        FDQuery.ParamByName('MARKE').AsString    := marke;
+        FDQuery.ParamByName('MODEL').AsString    := model;
+        FDQuery.ParamByName('JAHR').AsInteger    := jahr;
+        FDQuery.ParamByName('ZUSTAND').AsString  := zustand;
+      end;
+
+      FDQuery.ExecSQL;
+      AConnection.Commit;
+    except
+      AConnection.Rollback;
+      raise;
+    end;
+
+  finally
+    FDQuery.Free;
+  end;
+
+  // ===== UI =====
+  fMain.LoadInventarToListView;
+
+  if MessageDlg(
+       'Wollen Sie das geänderte Ankaufsformular als PDF speichern?',
+       mtConfirmation, [mbYes, mbNo], 0) = mrYes then
+  begin
+    ShowMessage('Hier Daten des Kunden und Ankaufsdaten auslesen und PDF-Formular generieren');
+  end;
+
+  Close;
+end;
+
+
+procedure TfEditKundenankauf.ShowKundenankaufEntryFromDB(const AConnection: TFDConnection);
+var
+  Q: TFDQuery;
+begin
+  Q := TFDQuery.Create(nil);
+  try
+    Q.Connection := AConnection;
+
+    Q.SQL.Text :=
+      'SELECT Einkaufsdatum, SKU, Ref, Box, Papiere, Marke, Model, Jahr, Einkaufswert, ' +
+      'Zustand, EinkaufBemerkung, Gewicht, Karat, Versand, Zahlungsart ' +
+      'FROM inventar WHERE id = :ID';
+
+    Q.ParamByName('ID').DataType := ftInteger;
+    Q.ParamByName('ID').AsInteger := ENTRYID;
+    Q.Open;
+
+    if not Q.IsEmpty then
+    begin
+      // ===== Default Ankaufsdaten =====
+      edReferenz.Text := Q.FieldByName('Ref').AsString;
+      edSKU.Text := Q.FieldByName('SKU').AsString;
+
+      // Datum: Helper-Funktion verwenden
+      LoadSQLiteDateToDTP(Q.FieldByName('Einkaufsdatum').AsString, dtpAnkaufsdatum);
+
+      // ===== Uhrenankauf =====
+      if (Trim(Q.FieldByName('Marke').AsString) = '') and
+         (Trim(Q.FieldByName('Model').AsString) = '') and
+         (Trim(Q.FieldByName('Zustand').AsString) = '') and
+         (Q.FieldByName('Box').AsInteger = 0) and
+         (Q.FieldByName('Papiere').AsInteger = 0) then
+      begin
+        UHR := False;
+        pnlUhr.Visible := False;
+      end
+      else
+      begin
+        UHR := True;
+        pnlUhr.Visible := True;
+
+        edMarke.Text := Q.FieldByName('Marke').AsString;
+        edModel.Text := Q.FieldByName('Model').AsString;
+        edJahr.Text := Q.FieldByName('Jahr').AsString;
+        cbBox.Checked := Q.FieldByName('Box').AsInteger = 1;
+        cbPapiere.Checked := Q.FieldByName('Papiere').AsInteger = 1;
+        SelectComboBoxItemByText(cbZustand, Q.FieldByName('Zustand').AsString);
+      end;
+
+      // ===== Ankaufsdaten =====
+      edBezeichnung.Text := Q.FieldByName('EinkaufBemerkung').AsString;
+
+      // Gewicht: einheitlich mit Helper-Funktion
+      if not Q.FieldByName('Gewicht').IsNull then
+        edGewicht.Text := Int100ToDecimalString(Q.FieldByName('Gewicht').AsInteger)
+      else
+        edGewicht.Clear;
+
+      edKarat.Text := Q.FieldByName('Karat').AsString;
+      SelectComboBoxItemByText(cbZahlungsarten, Q.FieldByName('Zahlungsart').AsString);
+
+      // Währungsbeträge: einheitlich mit Helper-Funktion
+      edAnkaufspreis.Text := Int100ToDecimalString(Q.FieldByName('Einkaufswert').AsLargeInt);
+      edVersand.Text := Int100ToDecimalString(Q.FieldByName('Versand').AsLargeInt);
+    end;
+  finally
+    Q.Free;
+  end;
+end;
+
+
+
+end.

@@ -1,0 +1,8 @@
+        <tr>
+          <td style="padding: 10px;">#REF</td>
+          <td style="padding: 10px; text-align:center">#BOX</td>
+          <td style="padding: 10px; text-align:center">#PAPIERE</td>
+          <td style="padding: 10px;">#MARKEMODEL</td>
+          <td style="padding: 10px; text-align:center">#JAHR</td>
+          <td style="padding: 10px; text-align: right">#KAUFPREIS €</td>
+        </tr>

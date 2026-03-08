@@ -1,0 +1,110 @@
+unit uLizenzDialog;
+
+interface
+
+uses
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
+  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.Mask, Vcl.ExtCtrls;
+
+type
+  TfLizenzDialog = class(TForm)
+    edEmail: TLabeledEdit;
+    edLizenzcode: TLabeledEdit;
+    lblStatus: TLabel;
+    btnAbbrechen: TButton;
+    btnOK: TButton;
+    Label1: TLabel;
+    procedure btnAbbrechenClick(Sender: TObject);
+    procedure btnOKClick(Sender: TObject);
+  private
+    FEmail: string;
+    FLizenzcode: string;
+  public
+    property Email: string read FEmail;
+    property Lizenzcode: string read FLizenzcode;
+  end;
+
+var
+  fLizenzDialog: TfLizenzDialog;
+
+implementation
+
+{$R *.dfm}
+
+uses
+  uFunctions, uLizenztools, uMain;
+
+
+
+
+procedure TfLizenzDialog.btnAbbrechenClick(Sender: TObject);
+begin
+  ModalResult := mrCancel;
+end;
+
+
+
+
+procedure TfLizenzDialog.btnOKClick(Sender: TObject);
+var
+  Antwort, Status, Grund: string;
+begin
+  lblStatus.Caption := '';
+
+  FEmail := Trim(edEmail.Text);
+  FLizenzcode := Trim(edLizenzcode.Text);
+
+  if FEmail = '' then
+  begin
+    lblStatus.Caption := 'Bitte E-Mail-Adresse eingeben.';
+    Exit;
+  end;
+
+  if FLizenzcode = '' then
+  begin
+    lblStatus.Caption := 'Bitte Lizenzcode eingeben.';
+    Exit;
+  end;
+
+  // Lizenz online prüfen – Hauptformular muss Programmname + HWID übergeben
+  Antwort := PruefeLizenzOnline(FLizenzcode, FEmail, GetHWID, ChangeFileExt(ExtractFileName(PROGRAMMNAME), ''));
+
+  if Pos('|', Antwort) > 0 then
+  begin
+    Status := Copy(Antwort, 1, Pos('|', Antwort) - 1);
+    Grund  := Copy(Antwort, Pos('|', Antwort) + 1, MaxInt);
+  end
+  else
+  begin
+    Status := Antwort;
+    Grund := '';
+  end;
+
+  if Status = 'OK' then
+  begin
+    LizenzSpeichern(FEmail, FLizenzcode);
+    ModalResult := mrOk; // Dialog schließen
+  end
+  else
+  begin
+    if Status = 'INACTIVE' then lblStatus.Caption := 'Lizenz deaktiviert: ' + Grund
+    else if Status = 'EXPIRED' then lblStatus.Caption := 'Lizenz abgelaufen.'
+    else if Status = 'NOT_YET_VALID' then lblStatus.Caption := 'Lizenz noch nicht gültig.'
+    else if Status = 'INVALID' then lblStatus.Caption := 'E-Mail oder Lizenzcode ungültig.'
+    else if Status = 'UNKNOWN_USER' then lblStatus.Caption := 'Unbekannte E-Mail-Adresse.'
+    else if Status = 'UNKNOWN_HWID' then lblStatus.Caption := 'Unbekannte Hardware ID.'
+    else if Status = 'NO_SLOT' then lblStatus.Caption := 'Maximale Anzahl registrierter Geräte erreicht.'
+    else if Status = 'UNKNOWN_HWID' then lblStatus.Caption := 'Unbekannte Hardware-ID. Lizenz auf diesem Gerät nicht aktiviert.'
+    else if Status = 'ERROR' then lblStatus.Caption := 'Lizenzserver nicht erreichbar.'
+    else lblStatus.Caption := 'Unbekannte Antwort: ' + Antwort;
+
+    lblStatus.Font.Color := clRed;
+    edLizenzcode.SetFocus;
+  end;
+end;
+
+
+
+
+
+end.

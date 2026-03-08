@@ -1,0 +1,87 @@
+﻿unit uMoneyHelper;
+
+interface
+
+uses
+  System.SysUtils, Vcl.StdCtrls, Vcl.ExtCtrls;
+
+
+// Konvertierung
+function DecimalStringToInt100(const EuroText: string): Int64;
+function Int100ToDecimalString(const Cent: Int64): string;
+
+// Validierung
+function IsValidDecimalString(const S: string): Boolean;
+
+
+implementation
+
+
+
+
+
+/// Konvertiert einen String im Euro-Format (z. B. '123,34') in einen Int64
+function DecimalStringToInt100(const EuroText: string): Int64;
+var
+  T: string;
+  F: Double;
+begin
+  T := Trim(EuroText);
+  if T = '' then
+    Exit(0);
+
+  // Alle Währungszeichen, Leerzeichen und Punkte/Kommas sauber umwandeln
+  T := StringReplace(T, '€', '', [rfReplaceAll]);
+  T := StringReplace(T, 'EUR', '', [rfReplaceAll, rfIgnoreCase]);
+  T := StringReplace(T, ' ', '', [rfReplaceAll]);
+  T := StringReplace(T, '.', '', [rfReplaceAll]);    // Tausenderpunkt entfernen
+  T := StringReplace(T, ',', '.', [rfReplaceAll]);   // Komma als Dezimaltrennzeichen
+
+  if not TryStrToFloat(T, F, TFormatSettings.Invariant) then
+    Exit(0);
+
+  Result := Round(F * 100);
+end;
+
+
+
+
+/// Konvertiert einen Integerwert zurück in einen tring mit 2 Nachkommastellen
+/// z.B. 123456 -> 1234,56
+function Int100ToDecimalString(const Cent: Int64): string;
+begin
+  Result := FormatFloat('0.00', Cent / 100);
+end;
+
+
+
+
+
+
+
+
+
+
+
+function IsValidDecimalString(const S: string): Boolean;
+var
+  T: string;
+  F: Double;
+begin
+  T := Trim(S);
+
+  if T = '' then
+    Exit(False);
+
+  T := StringReplace(T, '€', '', [rfReplaceAll]);
+  T := StringReplace(T, 'EUR', '', [rfReplaceAll, rfIgnoreCase]);
+  T := StringReplace(T, ' ', '', [rfReplaceAll]);
+  T := StringReplace(T, '.', '', [rfReplaceAll]); // Tausender
+  T := StringReplace(T, ',', '.', [rfReplaceAll]); // Dezimal
+
+  Result := TryStrToFloat(T, F, TFormatSettings.Invariant);
+end;
+
+
+end.
+

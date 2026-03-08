@@ -1,0 +1,5 @@
+03.03.2026
+- Das Fenster "Preisabfrage" wird jetzt auf Bildschirmen mit 
+  unterschiedlichen Skalierungen korrekt dargestellt auch wenn 
+  das Fenster auf einen Bildschirm mit einer anderen Skalierung 
+  verschoben wird.

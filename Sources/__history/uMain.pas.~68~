@@ -1,0 +1,2349 @@
+﻿unit uMain;
+
+interface
+
+uses
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.StrUtils, System.Variants,
+  System.Classes, Vcl.Graphics,
+  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.ComCtrls, AdvListV, Vcl.WinXPickers,
+  Vcl.StdCtrls, Vcl.Mask, Vcl.ExtCtrls, AdvDateTimePicker, WinAPI.CommCtrl,
+  FireDAC.Stan.ExprFuncs, FireDAC.Phys.SQLiteWrapper.Stat,
+  FireDAC.Phys.SQLiteDef, FireDAC.Stan.Intf, FireDAC.Stan.Option,
+  FireDAC.Stan.Error, FireDAC.UI.Intf, FireDAC.Phys.Intf, FireDAC.Stan.Def, FireDAC.Stan.Param,
+  FireDAC.Stan.Pool, FireDAC.Stan.Async, FireDAC.Phys, FireDAC.VCLUI.Wait,
+  Data.DB, FireDAC.Comp.Client, FireDAC.Phys.SQLite, System.IOUtils, DateUtils,
+  Vcl.Menus, Vcl.Buttons, Vcl.ToolWin, Vcl.ActnMan, Vcl.ActnCtrls,
+  System.ImageList, Vcl.ImgList, Vcl.Imaging.pngimage, AdvPageControl,
+  System.Actions, Vcl.ActnList, inifiles, Winapi.ShellAPI, System.UITypes, ComObj,
+  System.Generics.Collections;
+
+
+
+const
+  DB_INIT_SLEEP_MS = 50;
+  MAX_RETRY_ATTEMPTS = 3;
+  RETRY_SLEEP_MS = 100;
+  SQLITE_CACHE_SIZE = '10000';
+  SQLITE_PAGE_SIZE = '4096';
+  SQLITE_BUSY_TIMEOUT = '30000';
+  ONLINE_PANEL_INDEX = 0; //für Panel in Statusbar
+
+  STARTKUNDENNR    = 'KD000001';
+  STARTSKU_EINKAUF = 'TG000000';
+  STARTSKU_ANKAUF  = 'AK000050';
+  STARTKDNR_ANKAUF = 'KD000001';
+
+
+
+
+
+type
+  TfMain = class(TForm)
+    StatusBar1: TStatusBar;
+    FDPhysSQLiteDriverLink1: TFDPhysSQLiteDriverLink;
+    FDConnection1: TFDConnection;
+    Panel1: TPanel;
+    MainMenu1: TMainMenu;
+    Datei1: TMenuItem;
+    Inventarliste1: TMenuItem;
+    N3: TMenuItem;
+    Beenden1: TMenuItem;
+    Einstellungen1: TMenuItem;
+    mEinheiten: TMenuItem;
+    pmInventar: TPopupMenu;
+    N2: TMenuItem;
+    pmDeleteEntry: TMenuItem;
+    pmEditWareneinkauf: TMenuItem;
+    alInventar: TActionList;
+    acEditWareneinkauf: TAction;
+    acDeleteEntry: TAction;
+    tmStatusBar: TTimer;
+    tmHinweis: TTimer;
+    pnlContent: TPanel;
+    pnlHinweis: TPanel;
+    lbHinweis: TLabel;
+    Datenbank1: TMenuItem;
+    Sicherungerstellen1: TMenuItem;
+    Sicherungerstellen2: TMenuItem;
+    pnlWareneinkauf: TPanel;
+    lbWareneinkauf: TLabel;
+    pnlExportCSV: TPanel;
+    lbExportCSV: TLabel;
+    N1: TMenuItem;
+    InventarlistealsExceldateiinDatenbankimportieren1: TMenuItem;
+    pnlFortschrittsanzeige: TPanel;
+    Label1: TLabel;
+    Programmeinstellungen1: TMenuItem;
+    Hilfe1: TMenuItem;
+    ImporteinerExcelInventarliste1: TMenuItem;
+    Shortcuts1: TMenuItem;
+    acWareneinkauf: TAction;
+    Update1: TMenuItem;
+    mUpdate: TMenuItem;
+    acUpdate: TAction;
+    pnlAnkaufsformular: TPanel;
+    lbAnkaufsformular: TLabel;
+    N4: TMenuItem;
+    mZahlungsarten: TMenuItem;
+    mZustaende: TMenuItem;
+    Kunden1: TMenuItem;
+    Kundendaten1: TMenuItem;
+    mAnkaeufe: TMenuItem;
+    Ankaufsformular1: TMenuItem;
+    acEditKundenankauf: TAction;
+    Kundenankaufbearbeiten1: TMenuItem;
+    N5: TMenuItem;
+    N6: TMenuItem;
+    acAnleitung: TAction;
+    acExportAsCSV: TAction;
+    pnlSuche: TPanel;
+    acExportCSV: TAction;
+    Panel2: TPanel;
+    acHinweisfenster: TAction;
+    pnlInventarliste: TPanel;
+    lvInventar: TAdvListView;
+    pnlEdelmetallAnVerkauf: TPanel;
+    Panel3: TPanel;
+    N7: TMenuItem;
+    N8: TMenuItem;
+    cbShowEdelmetallAnVerkauf: TCheckBox;
+    Panel4: TPanel;
+    Panel6: TPanel;
+    Label5: TLabel;
+    lbEinkaeufeGesamtCount: TLabel;
+    Label7: TLabel;
+    lbVerkaeufeGesamtCount: TLabel;
+    pcEdelmetallAnVerkaeufe: TAdvPageControl;
+    AdvTabSheet1: TAdvTabSheet;
+    AdvTabSheet2: TAdvTabSheet;
+    lvEdelmetall: TAdvListView;
+    lvEdelmetallVerkauf: TAdvListView;
+    Panel5: TPanel;
+    btnEdelmetallVerkauf: TButton;
+    cbCheckUncheckAll: TCheckBox;
+    cbSuchfeld: TComboBox;
+    edSuchbegriff: TEdit;
+    btnSuche: TButton;
+    dtpSuchdatum: TDateTimePicker;
+    Label2: TLabel;
+    procedure FormCreate(Sender: TObject);
+    procedure FormClose(Sender: TObject; var Action: TCloseAction);
+    procedure FormDestroy(Sender: TObject);
+    procedure FormShow(Sender: TObject);
+    procedure btnSucheClick(Sender: TObject);
+    procedure ToolButton1Click(Sender: TObject);
+    procedure Image2Click(Sender: TObject);
+    procedure mEinheitenClick(Sender: TObject);
+    procedure Artikelverkaufen1Click(Sender: TObject);
+    procedure acDeleteEntryUpdate(Sender: TObject);
+    procedure acEditWareneinkaufUpdate(Sender: TObject);
+    procedure acEditWareneinkaufExecute(Sender: TObject);
+    procedure acDeleteEntryExecute(Sender: TObject);
+    procedure tmStatusBarTimer(Sender: TObject);
+    procedure lvInventarChange(Sender: TObject; Item: TListItem; Change: TItemChange);
+    procedure tmHinweisTimer(Sender: TObject);
+    procedure Sicherungerstellen1Click(Sender: TObject);
+    procedure Sicherungerstellen2Click(Sender: TObject);
+    procedure lbWareneinkaufClick(Sender: TObject);
+    procedure lbExportCSVClick(Sender: TObject);
+    procedure lbWareneinkaufMouseEnter(Sender: TObject);
+    procedure lbWareneinkaufMouseLeave(Sender: TObject);
+    procedure lbExportCSVMouseEnter(Sender: TObject);
+    procedure lbExportCSVMouseLeave(Sender: TObject);
+    procedure edSuchbegriffKeyPress(Sender: TObject; var Key: Char);
+    procedure Beenden1Click(Sender: TObject);
+    procedure InventarlistealsExceldateiinDatenbankimportieren1Click(Sender: TObject);
+    procedure lvInventarColumnClick(Sender: TObject; Column: TListColumn);
+    procedure lvInventarCompare(Sender: TObject; Item1, Item2: TListItem;Data: Integer; var Compare: Integer);
+    procedure Programmeinstellungen1Click(Sender: TObject);
+    procedure lvInventarEdited(Sender: TObject; Item: TListItem; var S: string);
+    procedure ImporteinerExcelInventarliste1Click(Sender: TObject);
+    procedure lvInventarMouseDown(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+    procedure Shortcuts1Click(Sender: TObject);
+    procedure acWareneinkaufExecute(Sender: TObject);
+    procedure mUpdateClick(Sender: TObject);
+    procedure lbUpdateClick(Sender: TObject);
+    procedure acUpdateUpdate(Sender: TObject);
+    procedure acUpdateExecute(Sender: TObject);
+    procedure acSucheUpdate(Sender: TObject);
+    procedure lbAnkaufsformularClick(Sender: TObject);
+    procedure lbAnkaufsformularMouseEnter(Sender: TObject);
+    procedure lbAnkaufsformularMouseLeave(Sender: TObject);
+    procedure mZustaendeClick(Sender: TObject);
+    procedure mZahlungsartenClick(Sender: TObject);
+    procedure Kundendaten1Click(Sender: TObject);
+    procedure mAnkaeufeClick(Sender: TObject);
+    procedure Ankaufsformular1Click(Sender: TObject);
+    procedure acEditKundenankaufUpdate(Sender: TObject);
+    procedure acEditKundenankaufExecute(Sender: TObject);
+    procedure acAnleitungExecute(Sender: TObject);
+    procedure cbSuchfeldSelect(Sender: TObject);
+    procedure dtpSuchdatumClick(Sender: TObject);
+    procedure edSuchbegriffChange(Sender: TObject);
+    procedure cbSuchfeldChange(Sender: TObject);
+    procedure dtpSuchdatumKeyPress(Sender: TObject; var Key: Char);
+    procedure acExportAsCSVExecute(Sender: TObject);
+    procedure acExportAsCSVUpdate(Sender: TObject);
+    procedure acHinweisfensterExecute(Sender: TObject);
+    procedure N8Click(Sender: TObject);
+    procedure cbShowEdelmetallAnVerkaufClick(Sender: TObject);
+    procedure btnEdelmetallVerkaufClick(Sender: TObject);
+    procedure cbCheckUncheckAllClick(Sender: TObject);
+    procedure lvEdelmetallCheckboxClick(Sender: TObject; iItem: Integer; State: Boolean);
+    procedure lvEdelmetallVerkaufDblClick(Sender: TObject);
+  private
+    FIsLoading: Boolean;
+    FInitComplete: Boolean;
+    FFirstShowDone: Boolean;
+    FHinweisIndex: Integer;
+    FHinweise: TArray<string>;
+    FUpdatingChecks: Boolean;
+
+    procedure ValidateExcelInventar_Strict(const OutputLabel: TLabel; const ExcelFile: string);
+    procedure ValidateCSVInventar_Strict(const OutputLabel: TLabel; const CSVFile: string);
+    procedure LoadInventarToListViewBySuchbegriff(Spalte, Suchbegriff: string);
+
+    procedure ImportDatenFromExcel;
+    procedure ImportDatenFromCSV;
+    procedure UpdateExportPanelVisibility;
+
+    procedure LoadSettings;
+
+    procedure LoadEdelmetallAnkaufToListView;
+    procedure LoadEdelmetallVerkaufToListView;
+  public
+    procedure LoadStatusBarValues;
+    procedure AktualisiereAndShowStatistik;
+    procedure LoadInventarToListView;
+  end;
+
+var
+  fMain: TfMain;
+  PATH, PATHHELP, PATHSCRIPTS, PATHTEMP, PATHDOKUMENTE, PATHANKAUFSFORMULARE: string;
+  PATHANKAUFSFORMULAREEDELMETALL, DBNAME, PROGRAMMNAME, PROGRAMMVERSION: string;
+  RemoteVersion, LokaleVersion: string;
+  ColumnToSort: Integer;
+  LastSorted: Integer;
+  SortDir: Integer;
+
+  SELItemID: integer;
+  SelMonth, SelYear: integer;
+
+  ListViewDirty, SHOWHINWEISFENSTER, SHOWEDELMETALLANVERKAUFWINDOW: Boolean;
+
+  WebsiteURL, ScriptURL, HilfeURL, UpdateURL, ProgrammURL, ProgrammShortURL: string;
+
+  FIRMENNAME, FIRMENINHABER, FIRMASTRASSE, FIRMAPLZ, FIRMAORT: string;
+  FIRMAUMSATZSTEUERID, FIRMAIBAN: string;
+
+implementation
+
+
+uses
+  uLizenzDialog, uFunctions, uDBFunctions, uEinheiten, uVerkauf, uEditWareneinkauf,
+  uSettings, uHelp, uUpdate, uAnkaufformular, uZustaende, uZahlungsarten,
+  uMarken, uKunden, uAnkaeufe, uEditKundenankauf, uLizenzTools,
+  uEdelmetallsammelverkauf, uMoneyHelper, uSQLiteDateHelper, uWareneinkauf,
+  uSplash, uSammelverkaeufe;
+
+{$R *.dfm}
+{$R ..\Resources\MyResources.RES}
+
+
+
+procedure TfMain.ValidateExcelInventar_Strict(const OutputLabel: TLabel; const ExcelFile: string);
+var
+  Excel, Workbook, Sheet: OleVariant;
+  Row: Integer;
+  S: string;
+begin
+  Excel := CreateOleObject('Excel.Application');
+  try
+    Excel.Visible := False;
+    Workbook := Excel.Workbooks.Open(ExcelFile);
+    Sheet := Workbook.Worksheets[1];
+
+    Row := 2; // Kopfzeile überspringen
+    while True do
+    begin
+      // === ENDE DER DATEI ERKENNEN (Spalte 1–7 leer) ===
+      if VarIsEmpty(Sheet.Cells[Row, 1].Value) and   //Kaufdatum
+         VarIsEmpty(Sheet.Cells[Row, 2].Value) and   //SKU
+         VarIsEmpty(Sheet.Cells[Row, 3].Value) and   //St. Frei Betrag
+         VarIsEmpty(Sheet.Cells[Row, 4].Value) and   //Verkaufsdatum
+         VarIsEmpty(Sheet.Cells[Row, 5].Value) and   //Verkaufsbetrag
+         VarIsEmpty(Sheet.Cells[Row, 6].Value) and   //Zu besteuernder Betrag
+         VarIsEmpty(Sheet.Cells[Row, 7].Value) then  //RechnungsNr
+        Break;
+
+      if Row mod 50 = 0 then
+        ShowProgress(OutputLabel, Format('Prüfe Zeile %d...', [Row]));
+
+
+      // ========= Spalte 1: Kaufdatum =========
+      S := Trim(VarToStr(Sheet.Cells[Row, 1].Text));
+      if (S <> '') and (not IsValidDisplayDate(S)) then
+      begin
+        ShowProgress(OutputLabel, 'Ungültiges Kaufdatum gefunden, Import wird abgebrochen...' + sLineBreak+'Bitte warten...');
+        raise Exception.CreateFmt('Ungültiges Kaufdatum in Zeile %d: "%s' + sLineBreak + 'Bitte geben Sie ein gültiges Datum ein!' + '"', [Row, S]);
+      end;
+
+      // ========= Spalte 2: SKU =========
+      S := Trim(VarToStr(Sheet.Cells[Row, 2].Text));
+      if S = '' then
+      begin
+        ShowProgress(OutputLabel, 'Leere SKU gefunden, Import wird abgebrochen...' + sLineBreak+'Bitte warten...');
+        raise Exception.CreateFmt('Leere SKU in Zeile %d', [Row]);
+      end;
+
+      // ========= Spalte 3: St. Frei Betrag - Einkaufswert =========
+      S := Trim(VarToStr(Sheet.Cells[Row, 3].Text));
+      if not IsValidDecimalString(S) then
+      begin
+        ShowProgress(OutputLabel, 'Ungültigen Einkaufswert gefunden, Import wird abgebrochen...' + sLineBreak+'Bitte warten...');
+        raise Exception.CreateFmt('Ungültiger Einkaufswert in Zeile %d: "%s"', [Row, S]);
+      end;
+
+      // ========= Spalte 4: Verkaufsdatum =========
+      S := Trim(VarToStr(Sheet.Cells[Row, 4].Text));
+      if (S <> '') and (not IsValidDisplayDate(S)) then
+      begin
+        ShowProgress(OutputLabel, 'Ungültiges Verkaufsdatum gefunden, Import wird abgebrochen...' + sLineBreak+'Bitte warten...');
+        raise Exception.CreateFmt('Ungültiges Verkaufsdatum in Zeile %d: "%s"' + sLineBreak + 'Bitte geben Sie ein gültiges Datum ein!' + '"', [Row, S]);
+      end;
+
+      // ========= Spalte 5: Verkaufswert =========
+      S := Trim(VarToStr(Sheet.Cells[Row, 5].Text));
+      if (S <> '') and (not IsValidDecimalString(S)) then
+      begin
+        ShowProgress(OutputLabel, 'Ungültigen Verkaufswert gefunden, Import wird abgebrochen...' + sLineBreak+'Bitte warten...');
+        raise Exception.CreateFmt('Ungültiger Verkaufswert in Zeile %d: "%s"', [Row, S]);
+      end;
+
+      // ========= Spalte 6: Steuerbetrag =========
+      S := Trim(VarToStr(Sheet.Cells[Row, 6].Text));
+      if (S <> '') and (not IsValidDecimalString(S)) then
+      begin
+        ShowProgress(OutputLabel, 'Ungültigen Steuerbetrag gefunden, Import wird abgebrochen...' + sLineBreak+'Bitte warten...');
+        raise Exception.CreateFmt('Ungültiger Steuerbetrag in Zeile %d: "%s"', [Row, S]);
+      end;
+
+      Inc(Row);
+    end;
+
+    ShowProgress(OutputLabel, 'Exceldatei erfolgreich geprüft.'+sLineBreak+'Keine Fehler vorhanden.');
+    Sleep(2000);
+  finally
+    Workbook.Close(False);
+    Excel.Quit;
+    Excel := Unassigned;
+  end;
+end;
+
+
+
+
+
+
+
+procedure TfMain.ValidateCSVInventar_Strict(const OutputLabel: TLabel; const CSVFile: string);
+var
+  Excel, Workbook, Sheet: OleVariant;
+  Row: Integer;
+  S: string;
+begin
+  Excel := CreateOleObject('Excel.Application');
+  try
+    Excel.Visible := False;
+    Workbook := Excel.Workbooks.Open(CSVFile);
+    Sheet := Workbook.Worksheets[1];
+
+    Row := 2; // Kopfzeile überspringen
+    while True do
+    begin
+      // === ENDE DER DATEI ERKENNEN (Spalte 1–7 leer) ===
+      if VarIsEmpty(Sheet.Cells[Row, 1].Value) and   //Kaufdatum
+         VarIsEmpty(Sheet.Cells[Row, 2].Value) and   //SKU
+         VarIsEmpty(Sheet.Cells[Row, 3].Value) and   //Einheit
+         VarIsEmpty(Sheet.Cells[Row, 4].Value) and   //St. Frei Betrag
+         VarIsEmpty(Sheet.Cells[Row, 5].Value) and   //Einkauf Bemerkung
+         VarIsEmpty(Sheet.Cells[Row, 6].Value) and   //Verkaufsdatum
+         VarIsEmpty(Sheet.Cells[Row, 7].Value) and   //Verkaufsbetrag
+         VarIsEmpty(Sheet.Cells[Row, 8].Value) and   //Verkauf Bemerkung
+         VarIsEmpty(Sheet.Cells[Row, 9].Value) and   //Zu besteuernder Betrag
+         VarIsEmpty(Sheet.Cells[Row, 10].Value) then //RechnungsNr
+         Break;
+
+      if Row mod 50 = 0 then
+        ShowProgress(OutputLabel, Format('Prüfe Zeile %d...', [Row]));
+
+      // ========= Spalte 1: Kaufdatum =========
+      S := Trim(VarToStr(Sheet.Cells[Row, 1].Text));
+      if (S <> '') and (not IsValidDisplayDate(S)) then
+      begin
+        ShowProgress(OutputLabel, 'Ungültiges Kaufdatum gefunden, Import wird abgebrochen...' + sLineBreak+'Bitte warten...');
+        raise Exception.CreateFmt('Ungültiges Kaufdatum in Zeile %d: "%s' + sLineBreak + 'Bitte geben Sie ein gültiges Datum ein!' + '"', [Row, S]);
+      end;
+
+      // ========= Spalte 2: SKU =========
+      S := Trim(VarToStr(Sheet.Cells[Row, 2].Text));
+      if S = '' then
+      begin
+        ShowProgress(OutputLabel, 'Leere SKU gefunden, Import wird abgebrochen...' + sLineBreak+'Bitte warten...');
+        raise Exception.CreateFmt('Leere SKU in Zeile %d', [Row]);
+      end;
+
+      // ========= Spalte 4: St. Frei Betrag (Einkaufsbetrag) =========
+      S := Trim(VarToStr(Sheet.Cells[Row, 4].Text));
+      if not IsValidDecimalString(S) then
+      begin
+        ShowProgress(OutputLabel, 'Ungültigen Einkaufswert gefunden, Import wird abgebrochen...' + sLineBreak+'Bitte warten...');
+        raise Exception.CreateFmt('Ungültiger Einkaufswert in Zeile %d: "%s"', [Row, S]);
+      end;
+
+      // ========= Spalte 6: Verkaufsdatum =========
+      S := Trim(VarToStr(Sheet.Cells[Row, 6].Text));
+      if (S <> '') and (not IsValidDisplayDate(S)) then
+      begin
+        ShowProgress(OutputLabel, 'Ungültiges Verkaufsdatum gefunden, Import wird abgebrochen...' + sLineBreak+'Bitte warten...');
+        raise Exception.CreateFmt('Ungültiges Verkaufsdatum in Zeile %d: "%s"' + sLineBreak + 'Bitte geben Sie ein gültiges Datum ein!' + '"', [Row, S]);
+      end;
+
+      // ========= Spalte 7: Verkaufswert =========
+      S := Trim(VarToStr(Sheet.Cells[Row, 7].Text));
+      if (S <> '') and (not IsValidDecimalString(S)) then
+      begin
+        ShowProgress(OutputLabel, 'Ungültigen Verkaufsbetrag gefunden, Import wird abgebrochen...' + sLineBreak+'Bitte warten...');
+        raise Exception.CreateFmt('Ungültiger Verkaufsbetrag in Zeile %d: "%s"', [Row, S]);
+      end;
+
+      // ========= Spalte 9: Steuerbetrag =========
+      S := Trim(VarToStr(Sheet.Cells[Row, 9].Text));
+      if (S <> '') and (not IsValidDecimalString(S)) then
+      begin
+        ShowProgress(OutputLabel, 'Ungültigen Steuerbetrag gefunden, Import wird abgebrochen...' + sLineBreak+'Bitte warten...');
+        raise Exception.CreateFmt('Ungültiger Steuerbetrag in Zeile %d: "%s"', [Row, S]);
+      end;
+
+      Inc(Row);
+    end;
+
+    ShowProgress(OutputLabel, 'CSV erfolgreich geprüft.'+sLineBreak+'Keine Fehler vorhanden.');
+    Sleep(2000);
+  finally
+    Workbook.Close(False);
+    Excel.Quit;
+    Excel := Unassigned;
+  end;
+end;
+
+
+
+
+
+
+procedure TfMain.acAnleitungExecute(Sender: TObject);
+begin
+  ShellExecute(0, 'open', PChar(ProgrammShortURL), nil, nil, SW_SHOWNORMAL);
+end;
+
+
+
+
+
+procedure TfMain.acDeleteEntryExecute(Sender: TObject);
+var
+  Idx: Integer;
+  ENTRYID: Integer;
+begin
+  Idx := lvInventar.ItemIndex;
+  if Idx = -1 then
+    Exit;
+
+  ENTRYID := StrToIntDef(lvInventar.Items[Idx].Caption, 0);
+  if ENTRYID = 0 then
+    Exit;
+
+  if MessageDlg('Wollen Sie den Eintrag mit der SKU "'+lvInventar.Items[idx].SubItems[1] +'" wirklich aus der Inventarliste löschen?', mtConfirmation, [mbYes, mbNo], 0) <> mrYes then
+    Exit;
+
+  // 1 Aus der Datenbank löschen
+  DeleteEntryFromInventar(FDConnection1, ENTRYID);
+
+  // 2 Eintrag aus der ListView entfernen
+  lvInventar.Items[Idx].Delete;
+
+  // 3 Nächsten Eintrag automatisch selektieren
+  if lvInventar.Items.Count > 0 then
+  begin
+    if Idx < lvInventar.Items.Count then
+      lvInventar.Items[Idx].Selected := True
+    else
+      lvInventar.Items[lvInventar.Items.Count - 1].Selected := True;
+  end;
+end;
+
+
+
+
+
+
+procedure TfMain.acDeleteEntryUpdate(Sender: TObject);
+var
+  i: integer;
+begin
+  i := lvInventar.ItemIndex;
+  if(i<>-1) then
+  begin
+    acDeleteEntry.Enabled := true;
+  end
+  else
+  begin
+    acDeleteEntry.Enabled := false;
+  end;
+end;
+
+
+
+
+procedure TfMain.acEditKundenankaufExecute(Sender: TObject);
+var
+  i: integer;
+begin
+  i := lvInventar.ItemIndex;
+  if(i <> -1) then
+  begin
+    fEditKundenankauf.ENTRYID := StrToInt(lvInventar.Items[i].SubItems[10]);
+
+    fEditKundenankauf.ShowModal;
+  end
+  else
+    exit;
+end;
+
+
+
+
+
+procedure TfMain.acEditKundenankaufUpdate(Sender: TObject);
+var
+  i: integer;
+begin
+  i := lvInventar.ItemIndex;
+  if(i<>-1) then
+  begin
+    if(lvInventar.Items[i].SubItems[10] <> '0') then
+    begin
+      acEditKundenankauf.Enabled := true;
+    end
+    else
+    begin
+      acEditKundenankauf.Enabled := false;
+    end;
+  end
+  else
+  begin
+    acEditKundenankauf.Enabled := false;
+  end;
+end;
+
+
+
+
+procedure TfMain.acEditWareneinkaufExecute(Sender: TObject);
+var
+  i: integer;
+begin
+  i := lvInventar.ItemIndex;
+  if(i <> -1) then
+  begin
+    fEditWareneinkauf.ENTRYID := StrToInt(lvInventar.Items[i].Caption);
+    fEditWareneinkauf.ShowModal;
+  end
+  else
+    exit;
+end;
+
+
+
+procedure TfMain.acEditWareneinkaufUpdate(Sender: TObject);
+var
+  i: integer;
+begin
+  i := lvInventar.ItemIndex;
+  if(i<>-1) then
+  begin
+    if(lvInventar.Items[i].SubItems[10] <> '0') then
+    begin
+      acEditWareneinkauf.Enabled := false;
+    end
+    else
+    begin
+      acEditWareneinkauf.Enabled := true;
+    end;
+  end
+  else
+  begin
+    acEditWareneinkauf.Enabled := false;
+  end;
+end;
+
+
+
+
+procedure TfMain.acExportAsCSVExecute(Sender: TObject);
+var
+  monatsnr: string;
+begin
+  if(SelMonth < 10) then
+    monatsnr := '0'+IntToStr(SelMonth)
+  else
+    monatsnr := IntToStr(SelMonth);
+
+  ExportListViewToCSV(lvInventar, PATHDOKUMENTE +'\'+ monatsnr + '_' + IntToStr(SelYear) + '.csv',
+  [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+  ['Kaufdatum', 'SKU', 'Einheit', 'St. Frei Betrag', 'Einkauf Bemerkung', 'Verkaufsdatum', 'Verkaufsbetrag', 'Verkauf Bemerkung', 'Zu besteuernder Betrag', 'Rechnung Nr.']);
+end;
+
+
+
+
+
+
+
+procedure TfMain.acExportAsCSVUpdate(Sender: TObject);
+var
+  i: integer;
+begin
+  i := lvInventar.Items.Count;
+  if(i>0) then
+  begin
+    acExportAsCSV.Enabled := true;
+  end
+  else
+  begin
+    acExportAsCSV.Enabled := false;
+  end;
+end;
+
+
+
+
+
+
+procedure TfMain.acHinweisfensterExecute(Sender: TObject);
+var
+  ini: TIniFile;
+begin
+  SHOWHINWEISFENSTER := not SHOWHINWEISFENSTER;
+
+  ini := TIniFile.Create(PATH + 'settings.ini');
+  try
+    ini.WriteBool('ANSICHT','ShowDownHintWindow',SHOWHINWEISFENSTER);
+  finally
+    ini.Free;
+  end;
+
+  tmHinweis.Enabled := SHOWHINWEISFENSTER;
+
+  if(SHOWHINWEISFENSTER) then
+  begin
+    pnlHinweis.Height := 130;
+  end
+  else
+  begin
+    pnlHinweis.Height := 0;
+  end;
+end;
+
+
+
+
+procedure TfMain.acSucheUpdate(Sender: TObject);
+begin
+  if(cbSuchfeld.ItemIndex <= 0) then
+  begin
+    edSuchbegriff.Enabled := false;
+    btnSuche.Enabled := false;
+  end
+  else
+  begin
+    edSuchbegriff.Enabled := true;
+    btnSuche.Enabled := true;
+  end;
+end;
+
+
+
+
+procedure TfMain.acUpdateExecute(Sender: TObject);
+begin
+  //Prüfen ob eine Internetverbindung besteht
+  CheckInternetAsync(WebsiteURL, procedure(IsOnline: Boolean)
+  begin
+    //Internetverbindung besteht
+    if IsOnline then
+    begin
+      //Prüfen ob ein Update vorhanden ist
+      CheckAndUpdateIfAvailableAsync(PROGRAMMVERSION); // z.B. '1.0.0.7'
+    end;
+  end);
+end;
+
+
+
+
+
+procedure TfMain.acUpdateUpdate(Sender: TObject);
+begin
+  //Prüfen ob eine Internetverbindung besteht
+  CheckInternetAsync(WebsiteURL, procedure(IsOnline: Boolean)
+  begin
+    //Internetverbindung besteht
+    if IsOnline then
+    begin
+      acUpdate.Enabled := true;
+      acUpdate.Caption := 'Nach Update suchen';
+    end
+    else
+    begin
+      acUpdate.Enabled := false;
+      acUpdate.Caption := 'Nach Update suchen (offline)';
+    end;
+  end);
+end;
+
+
+
+
+procedure TfMain.acWareneinkaufExecute(Sender: TObject);
+begin
+  fWareneinkauf.ShowModal;
+end;
+
+
+
+
+procedure TfMain.Ankaufsformular1Click(Sender: TObject);
+begin
+  if(FileExists(TPath.Combine(PATHHELP, 'Ankaufsformular.rtf'))) then
+  begin
+    fHelp.RichEdit1.Lines.LoadFromFile(TPath.Combine(PATHHELP, 'Ankaufsformular.rtf'));
+    fHelp.pnlTitel.Caption := 'Ankaufsformular';
+    fHelp.Width := 573;
+    fHelp.Height := 800;
+    fHelp.Show;
+  end
+  else
+  begin
+    showmessage('Die Datei "HILFE\Tastaturkuerzel.rtf"' + ' wurde nicht gefunden');
+  end;
+end;
+
+
+
+
+procedure TfMain.Artikelverkaufen1Click(Sender: TObject);
+var
+  i: integer;
+begin
+  i := lvInventar.ItemIndex;
+  if(i <> -1) then
+  begin
+    uVerkauf.ENTRYID := StrToInt(lvInventar.Items[i].Caption);
+    fVerkauf.ShowModal;
+  end
+  else
+    exit;
+end;
+
+
+
+
+
+procedure TfMain.Beenden1Click(Sender: TObject);
+begin
+  close;
+end;
+
+
+
+
+
+procedure TfMain.UpdateExportPanelVisibility;
+begin
+  pnlExportCSV.Visible := lvInventar.Items.Count > 0;
+end;
+
+
+
+procedure TfMain.btnEdelmetallVerkaufClick(Sender: TObject);
+var
+  i: Integer;
+  IDs: TList<Integer>;
+begin
+  IDs := TList<Integer>.Create;
+  try
+    for i := 0 to lvEdelmetall.Items.Count - 1 do
+      if lvEdelmetall.Items[i].Checked then
+        IDs.Add(StrToInt(lvEdelmetall.Items[i].SubItems[0]));
+
+    if IDs.Count = 0 then
+    begin
+      ShowMessage('Keine Einträge ausgewählt.');
+      Exit;
+    end;
+
+    fEdelmetallSammelverkauf := TfEdelmetallSammelverkauf.Create(nil);
+    try
+      fEdelmetallSammelverkauf.SetAnkaufIDs(IDs);
+
+      if fEdelmetallSammelverkauf.ShowModal = mrOk then
+      begin
+        LoadEdelmetallAnkaufToListView;
+        LoadEdelmetallVerkaufToListView;
+      end;
+
+    finally
+      fEdelmetallSammelverkauf.Free;
+    end;
+
+  finally
+    IDs.Free;
+  end;
+end;
+
+
+
+
+procedure TfMain.btnSucheClick(Sender: TObject);
+var
+  i: integer;
+  s: string;
+begin
+  i := cbSuchfeld.ItemIndex;
+
+  if(i <> -1) then
+  begin
+    case i of
+      1..2:
+      begin
+        if(dtpSuchdatum.Checked = false) then
+          s := ''
+        else
+          s := DateToStr(dtpSuchdatum.Date);
+
+        LoadInventarToListViewBySuchbegriff(cbSuchfeld.Text, s);
+      end;
+      3..5:
+      begin
+        s := edSuchbegriff.Text;
+        LoadInventarToListViewBySuchbegriff(cbSuchfeld.Text, s);
+      end;
+      6:
+      begin
+       //LoadInventarToListViewByEdelmetallSammelverkauf;
+      end
+    else
+     s := '';
+    end
+  end
+  else
+    s := '';
+
+  //LoadInventarToListViewBySuchbegriff(cbSuchfeld.Text, s);
+
+  UpdateExportPanelVisibility;
+end;
+
+
+
+
+
+procedure TfMain.cbShowEdelmetallAnVerkaufClick(Sender: TObject);
+var
+  ini: TIniFile;
+begin
+  pnlEdelmetallAnVerkauf.Visible := cbShowEdelmetallAnVerkauf.checked;
+
+  if(pnlEdelmetallAnVerkauf.Visible) then
+  begin
+     LoadEdelmetallAnkaufToListView;
+     LoadEdelmetallVerkaufToListView;
+  end;
+
+  ini := TiniFile.Create(PATH + 'settings.ini');
+  try
+    ini.WriteBool('ANSICHT', 'showEdelmetallAnVerkaufWindow', cbShowEdelmetallAnVerkauf.Checked);
+  finally
+    ini.Free;
+  end;
+
+  pcEdelmetallAnVerkaeufe.ActivePageIndex := 0;
+end;
+
+
+
+
+
+procedure TfMain.cbSuchfeldChange(Sender: TObject);
+begin
+  edSuchbegriff.Clear;
+  dtpSuchdatum.Checked := false;
+  btnSuche.Enabled := false;
+end;
+
+
+
+
+
+procedure TfMain.cbSuchfeldSelect(Sender: TObject);
+var
+  i: Integer;
+begin
+  i := cbSuchfeld.ItemIndex;
+  if i > 0 then
+  begin
+    edSuchbegriff.Clear;
+    case i of
+      1..2: // Einkaufsdatum, Verkaufsdatum
+      begin
+        dtpSuchdatum.Visible := True;
+        dtpSuchdatum.Date := Now;
+        dtpSuchdatum.Checked := False;
+        edSuchbegriff.Visible := False;
+        btnSuche.Visible := True;
+      end;
+      3..5: // SKU, Einheit, RechnungsNr
+      begin
+        dtpSuchdatum.Visible := False;
+        edSuchbegriff.Visible := True;
+        btnSuche.Enabled := False;
+        btnSuche.Visible := True;
+      end;
+      6: // Für Sammelverkauf vorgemerkt
+      begin
+        dtpSuchdatum.Visible := False;
+        edSuchbegriff.Visible := False;
+        btnSuche.Enabled := True;
+        btnSuche.Visible := True;
+      end;
+    else
+      dtpSuchdatum.Visible := False;
+      edSuchbegriff.Visible := False;
+      btnSuche.Visible := True;
+    end;
+  end
+  else
+  begin
+    btnSuche.Enabled := False;
+    dtpSuchdatum.Visible := False;
+    edSuchbegriff.Visible := False;
+    btnSuche.Visible := False;
+
+    if FInitComplete then
+    begin
+      LoadInventarToListView;
+    end;
+  end;
+end;
+
+
+
+
+
+
+procedure TfMain.cbCheckUncheckAllClick(Sender: TObject);
+var
+  i: Integer;
+begin
+  if FUpdatingChecks then
+    Exit;
+
+  FUpdatingChecks := True;
+  lvEdelmetall.Items.BeginUpdate;
+  try
+    for i := 0 to lvEdelmetall.Items.Count - 1 do
+      lvEdelmetall.Items[i].Checked := cbCheckUncheckAll.Checked;
+  finally
+    lvEdelmetall.Items.EndUpdate;
+    FUpdatingChecks := False;
+  end;
+end;
+
+
+
+
+
+procedure TfMain.dtpSuchdatumClick(Sender: TObject);
+begin
+  if(dtpSuchdatum.Checked) then
+    btnSuche.Enabled := true
+  else
+    btnSuche.Enabled := false;
+end;
+
+
+
+
+
+
+procedure TfMain.dtpSuchdatumKeyPress(Sender: TObject; var Key: Char);
+begin
+  if(Key = #13) then
+  begin
+    Key := #0;
+    btnSucheClick(Self);
+  end;
+  if(Key = #27) then
+  begin
+    Key := #0;
+    edSuchbegriff.Clear;
+    dtpSuchdatum.Date := now;
+    dtpSuchdatum.Checked := false;
+    btnSuche.Enabled := false;
+    LoadInventarToListView;
+  end;
+end;
+
+
+
+
+
+
+procedure TfMain.edSuchbegriffChange(Sender: TObject);
+begin
+  if(trim(edSuchbegriff.Text) <> '') then
+    btnSuche.Enabled := true
+  else
+    btnSuche.Enabled := false;
+end;
+
+
+
+
+
+procedure TfMain.edSuchbegriffKeyPress(Sender: TObject; var Key: Char);
+begin
+  if(Key = #13) then
+  begin
+    Key := #0;
+    btnSucheClick(Self);
+  end;
+  if(Key = #27) then
+  begin
+    Key := #0;
+    edSuchbegriff.Clear;
+    LoadInventarToListView;
+  end;
+end;
+
+
+
+
+
+procedure TfMain.mAnkaeufeClick(Sender: TObject);
+begin
+  fAnkaeufe.show;
+end;
+
+
+
+
+
+procedure TfMain.mEinheitenClick(Sender: TObject);
+begin
+  fEinheiten.ShowModal;
+end;
+
+
+
+
+
+procedure TfMain.FormClose(Sender: TObject; var Action: TCloseAction);
+var
+  ini: TIniFile;
+begin
+  // Timer deaktivieren, damit OnTimer-Handler nicht nach der Formularfreigabe ausgeführt werden
+  try
+    if Assigned(tmHinweis) then
+      tmHinweis.Enabled := False;
+  except
+  end;
+  try
+    if Assigned(tmStatusBar) then
+      tmStatusBar.Enabled := False;
+  except
+  end;
+  if FDConnection1.Connected then
+  begin
+    FDConnection1.Close;
+    sleep(500);
+  end;
+
+  CreateDailyDatabaseDumpWithPrompt(FDConnection1);
+
+  ini := TIniFile.Create(PATH + 'settings.ini');
+  try
+    ini.WriteInteger('DBDUMP','LastAutoDatabaseDump', Trunc(Now));
+    ini.WriteInteger('SUCHE','SpaltenIndex',cbSuchfeld.ItemIndex);
+  finally
+    ini.Free;
+  end;
+end;
+
+
+
+
+procedure TfMain.FormCreate(Sender: TObject);
+var
+  Lizenzcode, Email: string;
+begin
+  FIsLoading := True;
+  FInitComplete := False;
+  FFirstShowDone := False;
+
+  PATH             := ExtractFilePath(ParamStr(0));
+  PATHHELP         := TPath.Combine(PATH, 'Hilfe');
+  PATHSCRIPTS      := TPath.Combine(PATH, 'Scripts');
+  PATHTEMP         := TPath.Combine(PATH, 'Temp');
+  PATHDOKUMENTE    := TPath.Combine(PATH, 'Dokumente');
+  PATHANKAUFSFORMULARE := TPath.Combine(PATH, 'Dokumente\Ankaufsformulare');
+  PATHANKAUFSFORMULAREEDELMETALL := TPath.Combine(PATH, 'Dokumente\Ankaufsformulare\Edelmetalle');
+  DBNAME           := PATH + 'data.s3db';
+  LokaleVersion    := GetFileVersion;
+
+  SelMonth         := MonthOf(Now);
+  SelYear          := YearOf(Now);
+
+  //Lizenzcode := LizenzCodeGespeichert;
+  //Email      := EmailGespeichert;
+
+  PROGRAMMNAME := Application.ExeName;
+  PROGRAMMVERSION := GetAppVersion;
+
+  ForceDirectories(PATH + 'Temp');
+  ForceDirectories(PATH + 'Dokumente\Ankaufsformulare');
+  ForceDirectories(PATH + 'Dokumente\Ankaufsformulare\Edelmetalle');
+  ForceDirectories(PATH + 'Hilfe');
+  ForceDirectories(PATH + 'Scripts');
+
+  SaveResourceToFile('SQLITE3DLL64BIT', 'sqlite3.dll');
+  SaveResourceToFile('SSLEAY32', 'ssleay32.dll');
+  SaveResourceToFile('LIBEAY32', 'libeay32.dll');
+  SaveResourceToFile('wkhtmltopdfexe', TPath.Combine(PATHSCRIPTS, 'wkhtmltopdf.exe'));
+
+  SaveResourceToFile('EXCELIMPORT', TPath.Combine(PATHHELP, 'Inventarliste_als_Exceldatei_importieren.rtf'));
+  SaveResourceToFile('TASTATURKUERZEL', TPath.Combine(PATHHELP, 'Tastaturkuerzel.rtf'));
+  SaveResourceToFile('ANKAUFSFORMULAR', TPath.Combine(PATHHELP, 'Ankaufsformular.rtf'));
+
+  SaveResourceToFile('landscape', TPath.Combine(PATHSCRIPTS, 'print_landscape.bat'));
+  SaveResourceToFile('portrait', TPath.Combine(PATHSCRIPTS, 'print_portrait.bat'));
+  SaveResourceToFile('html2pdf', TPath.Combine(PATHSCRIPTS, 'printHtmlAsPDF.bat'));
+  SaveResourceToFile('wkhtmltoxdll', TPath.Combine(PATHSCRIPTS, 'wkhtmltox.dll'));
+
+
+
+
+  pnlFortschrittsanzeige.Height := 0;
+
+  ListViewDirty := False;
+
+  // 1 Lizenzdialog anzeigen, falls noch keine Daten lokal gespeichert
+  LizenzCheck;
+
+  // 2 Lizenz prüfen, immer gegen den Server
+  if not CheckLicense then
+    Application.Terminate;
+
+
+  // Datenbankverbindung sicherstellen
+  try
+    FDConnection1.Connected := False; // Sicherstellen, dass die Verbindung geschlossen ist
+    FDConnection1.DriverName := 'SQLite';
+    FDConnection1.Params.Values['Database'] := DBNAME; // Datenbankname/Pfad
+    FDConnection1.Params.Values['CharacterSet'] := 'utf8';
+    FDConnection1.Params.Values['LockingMode'] := 'Normal'; // Besseres Locking für SQLite
+    FDConnection1.Params.Values['Synchronous'] := 'Normal'; // Ausgewogenes Performance/Sicherheit
+    FDConnection1.Params.Values['JournalMode'] := 'WAL'; // Write-Ahead Logging für bessere Performance
+    FDConnection1.Params.Values['CacheSize'] := SQLITE_CACHE_SIZE; // Cache-Größe erhöhen
+    FDConnection1.Params.Values['TempStore'] := 'Memory'; // Temporäre Daten im Speicher
+    FDConnection1.Params.Values['PageSize'] := SQLITE_PAGE_SIZE; // Standard-Seitengröße
+    // Zusätzliche Parameter für noch bessere Performance
+    FDConnection1.Params.Values['BusyTimeout'] := SQLITE_BUSY_TIMEOUT; // 30 Sekunden Timeout
+    FDConnection1.Params.Values['ForeignKeys'] := 'ON'; // Referentielle Integrität
+    FDConnection1.Params.Values['RecursiveTriggers'] := 'ON'; // Trigger-Unterstützung
+    FDConnection1.Connected := true;
+    FDConnection1.ExecSQL('PRAGMA foreign_keys = ON');
+    FDConnection1.Open();
+
+    // Kurz warten, damit die Verbindung vollständig initialisiert wird
+    Sleep(DB_INIT_SLEEP_MS);
+
+  except
+    on E: Exception do
+    begin
+      ShowMessage('Fehler beim Verbinden zur Datenbank: ' + E.Message);
+      Application.Terminate;
+    end;
+  end;
+
+  FHinweise := [
+    'Wareneinkauf'+sLineBreak+'Klicke auf den Button "Wareneinkauf".'+sLineBreak+'Tastaturkürzel: Strg + E',
+    'Wareneinkauf bearbeiten'+sLineBreak+'Rechte Maustaste -> Wareneinkauf bearbeiten.' + sLineBreak + 'Tastaturkürzel: Strg + Doppelklick',
+    'Warenverkauf'+sLineBreak+'Doppelklick auf den Artikel in der Liste.',
+    'Einheit bearbeiten'+sLineBreak+'Hauptmenü -> Einstellungen -> Einheiten.'+sLineBreak+'Tastaturkürzel: Strg + F2',
+    'Artikel löschen'+sLineBreak+'Rechtsklick -> Eintrag löschen'+sLineBreak+'Tastaturkürzel: Strg + Del'
+  ];
+
+  FHinweisIndex := 0;
+  lbHinweis.Caption := FHinweise[FHinweisIndex];
+
+  tmHinweis.Interval := 5000;
+  tmHinweis.Enabled := True;
+
+  CreateDatabaseTables;
+end;
+
+
+
+
+
+procedure TfMain.FormDestroy(Sender: TObject);
+begin
+  ClearTempFolder;
+
+  try
+    if FDConnection1.Connected then
+    begin
+      FDConnection1.Close; // Verbindung schließen
+    end;
+  except
+    on E: Exception do
+    begin
+      showmessage('Fehler beim Schließen der Datenbankverbindung: ' + E.Message);
+    end;
+  end;
+end;
+
+
+
+
+
+
+
+
+
+
+procedure TfMain.FormShow(Sender: TObject);
+var
+  version: string;
+  ini: TIniFile;
+begin
+  // ===== Nur beim allerersten Aufruf =====
+  if not FFirstShowDone then
+  begin
+    FFirstShowDone := True;
+
+    LoadSettings;
+
+    // Beim ersten Aufruf: Caption setzen
+    if GetFileVersion <> '' then
+      version := 'V ' + GetFileVersion
+    else
+      version := '';
+
+    fMain.Caption := 'Keller - Inventarliste ' + version + '   -   copyright by: Enrico Sadlowski (2025)';
+
+    // Nur laden wenn ListView leer ist
+    if lvInventar.Items.Count = 0 then
+    begin
+      LoadInventarToListView;
+
+      if SHOWEDELMETALLANVERKAUFWINDOW then
+      begin
+        LoadEdelmetallAnkaufToListView;
+        LoadEdelmetallVerkaufToListView;
+      end;
+    end;
+
+    // UI-Anpassungen
+    tmHinweis.Enabled := SHOWHINWEISFENSTER;
+    if SHOWHINWEISFENSTER then
+      pnlHinweis.Height := 130
+    else
+      pnlHinweis.Height := 0;
+
+    cbSuchfeldSelect(nil);
+
+    // ===== WICHTIG: Initialisierung abgeschlossen! =====
+    FIsLoading := False;      // ← NEU!
+    FInitComplete := True;    // ← NEU!
+  end;
+
+
+  // ===== Bei jedem Aufruf (auch 2., 3., ...) =====
+  // Updatefunktion (async, läuft im Hintergrund)
+  CheckInternetAsync(WebsiteURL, procedure(IsOnline: Boolean)
+  begin
+    if IsOnline then
+    begin
+      GetRemoteVersionAsync(UpdateURL + 'version.txt', procedure(RemoteVersion: string)
+      begin
+        if RemoteVersion = '' then
+          Exit;
+
+        if VersionCompare(LokaleVersion, RemoteVersion) < 0 then
+        begin
+          Ini := TIniFile.Create(PATH + 'settings.ini');
+          try
+            if IsUpdateQuestionAllowed(Ini) then
+              mUpdateClick(nil);
+          finally
+            Ini.Free;
+          end;
+        end;
+      end);
+    end;
+  end);
+end;
+
+
+
+
+procedure TfMain.LoadStatusBarValues;
+var
+  ini: TIniFile;
+  i: integer;
+  D: TDate;
+begin
+  ini := TIniFile.Create(PATH + 'settings.ini');
+  try
+    i := ini.ReadInteger('DATENEXPORT', 'LastExport', 0);
+    if I > 0 then
+    begin
+      D := I; // Integer → TDate
+      StatusBar1.Panels[2].Text := 'Letzter Datenexport: ' + FormatDateTime('dd.mm.yyyy', D);
+    end
+    else
+      StatusBar1.Panels[2].Text := 'Letzter Datenexport: Nie';
+
+    i := ini.ReadInteger('DBDUMP', 'LastAutoDatabaseDump', 0);
+    if I > 0 then
+    begin
+      D := I; // Integer → TDate
+      StatusBar1.Panels[3].Text := 'Letzte autom. Datenbanksicherung: ' + FormatDateTime('dd.mm.yyyy', D);
+    end
+    else
+      StatusBar1.Panels[3].Text := 'Letzte autom. Datenbanksicherung: Nie';
+  finally
+    ini.Free;
+  end;
+
+  StatusBar1.Panels[1].Text := 'Einträge gesamt: ' + IntToStr(lvInventar.GetCount);
+end;
+
+
+
+
+procedure TfMain.AktualisiereAndShowStatistik;
+begin
+  //Gesamtsttistik EINKÄUFE HEUTE
+  //lbEinkaeufeHeuteCount.Caption := IntToStr(GetCountStatistik(FDConnection1, 'inventar', 'Einkaufsdatum', true));
+
+  //Gesamtstatistik EINKÄUFE Edelmetall HEUTE
+  //lbEdelmetallEinkaeufeHeuteCount.Caption := IntToStr(GetCountStatistik(FDConnection1, 'ankaufEdelmetall', 'Ankaufsdatum', true));
+
+  //Gesamtstatistik EINKÄUFE GESAMT
+  lbEinkaeufeGesamtCount.Caption := IntToStr(GetCountStatistik(FDConnection1, 'inventar', 'Einkaufsdatum', false));
+
+
+  //Gesamtstatistik VERKÄUFE HEUTE
+  //lbVerkaeufeHeuteCount.Caption := IntToStr(GetCountStatistik(FDConnection1, 'inventar', 'Verkaufsdatum', true));
+
+  //Gesamtstatistik VERKÄUFE Edelmetall HEUTE
+  //lbEdelmetallVerkaeufeHeuteCount.Caption := IntToStr(GetCountStatistik(FDConnection1, 'verkaufEdelmetall', 'Verkaufsdatum', true));
+
+  //Gesamtstatistik VERKÄUFE GESAMT
+  lbVerkaeufeGesamtCount.Caption := IntToStr(GetCountStatistik(FDConnection1, 'inventar', 'Verkaufsdatum', false));
+
+
+  StatusBar1.Panels[1].Text := 'Einträge gesamt: ' + IntToStr(lvInventar.GetCount);
+end;
+
+
+
+procedure TfMain.LoadSettings;
+var
+  ini: TIniFile;
+  OldOnChange: TNotifyEvent;
+begin
+  ini := TIniFile.Create(PATH + 'settings.ini');
+  try
+    FIRMENNAME    := ini.ReadString('FIRME', 'Firmenname', 'Uhren & Schmuck Togge');
+    FIRMENINHABER := ini.ReadString('FIRMA', 'Firmeninhaber', 'Alexander Keller');
+    FIRMASTRASSE  := ini.ReadString('FIRMA', 'FirmaStrasse', 'Siemens Straße 12');
+    FIRMAPLZ      := ini.ReadString('FIRMA', 'FirmaPLZ', '86899');
+    FIRMAORT      := ini.ReadString('FIRMA', 'FirmaOrt', 'Landsberg am Lech');
+    FIRMAUMSATZSTEUERID := ini.ReadString('FIRMA', 'FirmaUStID', 'DE353427576');
+    FIRMAIBAN     := ini.ReadString('FIRMA', 'FirmaIBAN', 'DE72 2060 0022 8620 49');
+
+    // ===== Event temporär deaktivieren =====
+    OldOnChange := cbSuchfeld.OnChange;
+    cbSuchfeld.OnChange := nil;
+    try
+      cbSuchfeld.ItemIndex := ini.ReadInteger('SUCHE', 'SpaltenIndex', 0);
+    finally
+      cbSuchfeld.OnChange := OldOnChange;
+    end;
+
+    // ===== NICHT cbSuchfeldSelect aufrufen während FIsLoading! =====
+    if not FIsLoading then
+      cbSuchfeldSelect(nil);
+
+    ColumnToSort := ini.ReadInteger('SORTIERUNG', 'Spalte', 1);
+    if ini.ReadBool('SORTIERUNG', 'SortDirection', True) then
+      SortDir := 1
+    else
+      SortDir := 0;
+
+    SHOWHINWEISFENSTER := ini.ReadBool('ANSICHT', 'ShowDownHintWindow', True);
+    SHOWEDELMETALLANVERKAUFWINDOW := ini.ReadBool('ANSICHT', 'showEdelmetallAnVerkaufWindow', False);
+    cbShowEdelmetallAnVerkauf.Checked := SHOWEDELMETALLANVERKAUFWINDOW;
+  finally
+    ini.Free;
+  end;
+
+  LastSorted := 1;
+
+  // ===== AlphaSort nur wenn nicht im Ladevorgang =====
+  if not FIsLoading then
+    lvInventar.AlphaSort;
+end;
+
+
+
+
+
+procedure TfMain.Image2Click(Sender: TObject);
+begin
+  fWareneinkauf.ShowModal;
+end;
+
+
+
+
+
+procedure TfMain.ImporteinerExcelInventarliste1Click(Sender: TObject);
+begin
+  if(FileExists(TPath.Combine(PATHHELP, 'Inventarliste_als_Exceldatei_importieren.rtf'))) then
+  begin
+    fHelp.RichEdit1.Lines.LoadFromFile(TPath.Combine(PATHHELP, 'Inventarliste_als_Exceldatei_importieren.rtf'));
+    fHelp.pnlTitel.Caption := 'Inventarliste als Exceldatei importieren';
+    fHelp.Width := 660;
+    fHelp.Height := 735;
+    fHelp.Show;
+  end
+  else
+  begin
+    showmessage('Die Datei "HILFE\Inventarliste_als_Exceldatei_importieren.rtf" wurde nicht gefunden!');
+    exit;
+  end;
+end;
+
+
+
+procedure TfMain.InventarlistealsExceldateiinDatenbankimportieren1Click(Sender: TObject);
+begin
+  //Abfrage ob der Datenbestand aus einer CSV Datei die für den
+  //Steuerberater erzeugt wurde oder eine Excel.Datei importiert werden soll.
+  if MessageDlg('Wollen Sie den Datenbestand aus einer CSV-Datei, die für den Steuerberater erzeugt wurde, importieren?', mtConfirmation, [mbYes, mbNo], 0) = mrYes then
+  begin
+    ImportDatenFromCSV;
+  end
+  else if MessageDlg('Wollen Sie den Datenbestand aus einer Excel- oder ods Datei importieren?', mtConfirmation, [mbYes, mbNo], 0) = mrYes then
+  begin
+    ImportDatenFromExcel;
+  end;
+end;
+
+
+
+
+
+procedure TfMain.ImportDatenFromExcel;
+var
+  OpenDlg: TOpenDialog;
+  Ext: string;
+begin
+  if(lvInventar.Items.Count > 0) then
+  begin
+    if MessageDlg('Wollen Sie die Inventarliste vor dem Import der Excel Datei leeren?',
+         mtConfirmation, [mbYes, mbNo], 0) = mrYes then
+    begin
+      DeleteInventar(FDConnection1);
+    end;
+  end;
+
+
+  OpenDlg := TOpenDialog.Create(nil);
+  try
+    OpenDlg.Title := 'Tabellendatei für Import auswählen';
+    OpenDlg.Filter :=
+      'Tabellendateien (*.xlsx;*.xls;*.ods)|*.xlsx;*.xls;*.ods|' +
+      'Excel Dateien (*.xlsx;*.xls)|*.xlsx;*.xls|' +
+      'OpenDocument (*.ods)|*.ods|' +
+      'Alle Dateien (*.*)|*.*';
+    OpenDlg.Options := [ofFileMustExist, ofPathMustExist];
+
+    if not OpenDlg.Execute then
+      Exit;
+
+    Ext := LowerCase(ExtractFileExt(OpenDlg.FileName));
+
+    if Ext = '.ods' then
+      ShowMessage(
+        'Hinweis:'#13#10 +
+        'ODS-Dateien können nur importiert werden,'#13#10 +
+        'wenn Excel sie öffnen kann.'#13#10#13#10 +
+        'Falls es fehlschlägt, bitte ODS vorher als XLSX speichern.'
+      );
+
+    pnlFortschrittsanzeige.Height := 70;
+
+    // --- Panel auf Endhöhe setzen und erste Statusmeldung ---
+    Label1.Caption := 'Prüfe Excel-Inventarliste...' + sLineBreak + 'Bitte warten!';
+    Application.ProcessMessages;
+    sleep(200);
+
+    try
+      // 1. Strikte Vorab-Validierung
+      ValidateExcelInventar_Strict(Label1, OpenDlg.FileName);
+
+      // Statusmeldung vor Import
+      Label1.Caption := 'Importiere Excel-Inventarliste in die Datenbank...';
+      Application.ProcessMessages;
+
+      // 2. Import
+      ImportExcelToInventar(FDConnection1, OpenDlg.FileName, Label1);
+
+      // Inventarliste aktualisieren
+      LoadInventarToListView;
+
+
+      pnlFortschrittsanzeige.Height := 0;
+      ShowMessage('Import erfolgreich abgeschlossen.');
+    except
+      on E: Exception do
+      begin
+        MessageDlg('Import abgebrochen:'#13#10 + E.Message,
+                   mtError,
+                   [mbOK],
+                   0);
+      end;
+    end;
+
+
+  finally
+    OpenDlg.Free;
+  end;
+end;
+
+
+
+
+
+procedure TfMain.ImportDatenFromCSV;
+var
+  OpenDlg: TOpenDialog;
+begin
+  if(lvInventar.Items.Count > 0) then
+  begin
+    if MessageDlg('Wollen Sie die Inventarliste vor dem Import der CSV Datei leeren?',
+         mtConfirmation, [mbYes, mbNo], 0) = mrYes then
+    begin
+      DeleteInventar(FDConnection1);
+    end;
+  end;
+
+  OpenDlg := TOpenDialog.Create(nil);
+  try
+    OpenDlg.Title := 'Tabellendatei für Import auswählen';
+    OpenDlg.Filter := 'Tabellendateien (*.csv)|*.csv|Alle Dateien (*.*)|*.*';
+    OpenDlg.Options := [ofFileMustExist, ofPathMustExist];
+
+    if not OpenDlg.Execute then
+      Exit;
+
+    pnlFortschrittsanzeige.Height := 70;
+    Label1.Caption := 'Prüfe CSV-Inventarliste...' + sLineBreak + 'Bitte warten!';
+    Application.ProcessMessages;
+    Sleep(200);
+
+    try
+      // 1. Strikte Vorab-Validierung
+      ValidateCSVInventar_Strict(Label1, OpenDlg.FileName);
+
+      // Statusmeldung vor Import
+      Label1.Caption := 'Importiere CSV-Inventarliste in die Datenbank...';
+      Application.ProcessMessages;
+
+      // 2. Import mit Datumskonvertierung
+      ImportCSVToInventar(FDConnection1, OpenDlg.FileName, Label1);
+
+      // Inventarliste aktualisieren
+      LoadInventarToListView;
+      pnlFortschrittsanzeige.Height := 0;
+
+      ShowMessage('Import erfolgreich abgeschlossen.');
+    except
+      on E: Exception do
+      begin
+        pnlFortschrittsanzeige.Height := 0;
+        MessageDlg('Import abgebrochen:'#13#10 + E.Message, mtError, [mbOK], 0);
+      end;
+    end;
+  finally
+    OpenDlg.Free;
+  end;
+end;
+
+
+
+
+
+
+procedure TfMain.Kundendaten1Click(Sender: TObject);
+begin
+  fKunden.show;
+end;
+
+
+
+
+
+procedure TfMain.lbAnkaufsformularClick(Sender: TObject);
+begin
+  fAnkaufformular.Show;
+end;
+
+
+
+
+
+procedure TfMain.lbAnkaufsformularMouseEnter(Sender: TObject);
+begin
+  pnlAnkaufsformular.Top := pnlAnkaufsformular.Top + 1;
+  pnlAnkaufsformular.Left := pnlAnkaufsformular.Left + 1;
+end;
+
+
+
+
+
+procedure TfMain.lbAnkaufsformularMouseLeave(Sender: TObject);
+begin
+  pnlAnkaufsformular.Top := pnlAnkaufsformular.Top - 1;
+  pnlAnkaufsformular.Left := pnlAnkaufsformular.Left - 1;
+end;
+
+
+
+
+
+procedure TfMain.lbExportCSVClick(Sender: TObject);
+var
+  FileName: string;
+begin
+  if MessageDlg('ACHTUNG: ' + sLineBreak +
+       'Einträge werden  genau so exportiert wie diese in der Liste angezeigt werden, ' +
+       'also passen Sie bitte die Anzeige der Daten und die Sortierung vorher an Ihre Bedürfnisse an!' + sLineBreak + sLineBreak +
+       'Wollen Sie die Liste jetzt als CSV exportieren?',
+       mtConfirmation, [mbYes, mbNo], 0) <> mrYes then
+    Exit;
+
+  Filename := TPath.Combine(PATH, 'DOKUMENTE\Inventarliste.csv');
+
+  ExportListViewToCSV(
+    lvInventar,
+    FileName,
+    [0,1,2,3,4,5,6,7,8,9],
+    ['Kaufdatum', 'SKU', 'Einheit', 'St. Frei Betrag',
+     'Einkauf Bemerkung', 'Verkaufsdatum', 'Verkaufsbetrag',
+     'Verkauf Bemerkung', 'Zu besteuernder Betrag', 'Rechnung Nr.']
+  );
+
+  // Nachfrage nach dem Export
+  if MessageDlg('Export abgeschlossen.' + sLineBreak +
+       'Möchten Sie die exportierte Datei im Datei-Explorer anzeigen?',
+       mtConfirmation, [mbYes, mbNo], 0) = mrYes then
+  begin
+    if FileExists(FileName) then
+      ShellExecute(0, 'open', 'explorer.exe', PChar('/select,"' + FileName + '"'), nil, SW_SHOWNORMAL);
+  end;
+  LoadSettings;
+end;
+
+
+
+
+
+procedure TfMain.lbExportCSVMouseEnter(Sender: TObject);
+begin
+  pnlExportCSV.Left := pnlExportCSV.Left + 1;
+  pnlExportCSV.Top := pnlExportCSV.Top + 1;
+end;
+
+
+
+
+
+procedure TfMain.lbExportCSVMouseLeave(Sender: TObject);
+begin
+  pnlExportCSV.Left := pnlExportCSV.Left - 1;
+  pnlExportCSV.Top := pnlExportCSV.Top - 1;
+end;
+
+
+
+
+
+procedure TfMain.lbUpdateClick(Sender: TObject);
+begin
+  mUpdateClick(nil);
+end;
+
+
+
+
+
+procedure TfMain.lbWareneinkaufClick(Sender: TObject);
+begin
+  acWareneinkauf.Execute;
+end;
+
+
+
+
+
+procedure TfMain.lbWareneinkaufMouseEnter(Sender: TObject);
+begin
+  pnlWareneinkauf.Top := pnlWareneinkauf.Top + 1;
+  pnlWareneinkauf.Left := pnlWareneinkauf.Left + 1;
+end;
+
+
+
+
+
+procedure TfMain.lbWareneinkaufMouseLeave(Sender: TObject);
+begin
+  pnlWareneinkauf.Top := pnlWareneinkauf.Top - 1;
+  pnlWareneinkauf.Left := pnlWareneinkauf.Left - 1;
+end;
+
+
+
+
+procedure TfMain.LoadInventarToListView;
+var
+  Q: TFDQuery;
+  Item: TListItem;
+  SubItems: TStringList;
+  Einkaufsdatum, Verkaufsdatum: string;
+  Einkaufswert, Verkaufswert, Steuerbetrag: Int64;
+begin
+  lvInventar.Items.BeginUpdate;
+  try
+    lvInventar.Items.Clear;
+
+    Q := TFDQuery.Create(nil);
+    SubItems := TStringList.Create;
+    try
+      Q.Connection := FDConnection1;
+
+      // Optimierte SQL: keine CASTs nötig
+      Q.SQL.Text :=
+        'SELECT id, Einkaufsdatum, Verkaufsdatum, SKU, Einkaufswert, EinkaufBemerkung, ' +
+        'Verkaufswert, VerkaufBemerkung, Steuerbetrag, RechnungsNr, Einheit, AnkaufformularID ' +
+        'FROM inventar ' +
+        'ORDER BY id DESC';
+
+      Q.Open;
+
+      while not Q.Eof do
+      begin
+        Item := lvInventar.Items.Add;
+        Item.Caption := Q.FieldByName('id').AsString;
+
+        // SubItems sammeln
+        SubItems.Clear;
+
+        Einkaufsdatum := Q.FieldByName('Einkaufsdatum').AsString;
+        Verkaufsdatum := Q.FieldByName('Verkaufsdatum').AsString;
+
+        Einkaufswert := Q.FieldByName('Einkaufswert').AsLargeInt;
+        Verkaufswert := Q.FieldByName('Verkaufswert').AsLargeInt;
+        Steuerbetrag := Q.FieldByName('Steuerbetrag').AsLargeInt;
+
+        SubItems.Add(SQLiteDateToDisplay(Einkaufsdatum));
+        SubItems.Add(Q.FieldByName('SKU').AsString);
+        SubItems.Add(Q.FieldByName('Einheit').AsString);
+        SubItems.Add(Int100ToDecimalString(Einkaufswert));
+        SubItems.Add(Q.FieldByName('EinkaufBemerkung').AsString);
+        SubItems.Add(SQLiteDateToDisplay(Verkaufsdatum));
+
+        // Verkaufswert (leeren String bei NULL)
+        if Q.FieldByName('Verkaufswert').IsNull then
+          SubItems.Add('')
+        else
+          SubItems.Add(Int100ToDecimalString(Verkaufswert));
+
+        SubItems.Add(Q.FieldByName('VerkaufBemerkung').AsString);
+
+        // Steuerbetrag (leeren String bei NULL)
+        if Q.FieldByName('Steuerbetrag').IsNull then
+          SubItems.Add('')
+        else
+          SubItems.Add(Int100ToDecimalString(Steuerbetrag));
+
+        SubItems.Add(Q.FieldByName('RechnungsNr').AsString);
+        SubItems.Add(Q.FieldByName('AnkaufformularID').AsString);
+
+        // Alle SubItems auf einmal hinzufügen
+        Item.SubItems.AddStrings(SubItems);
+
+        Q.Next;
+      end;
+
+    finally
+      Q.Free;
+      SubItems.Free;
+    end;
+
+  finally
+    lvInventar.Items.EndUpdate;
+  end;
+
+  // Letzte Sortierung entfällt, SQL liefert bereits sortiert
+  LastSorted := 1;
+end;
+
+
+
+
+
+
+
+procedure TfMain.LoadEdelmetallAnkaufToListView;
+var
+  Q: TFDQuery;
+  Item: TListItem;
+  SubItems: TStringList;
+  Ankaufsdatum: string;
+  Ankaufswert, Gewicht: Int64;
+begin
+  lvEdelmetall.Items.BeginUpdate;
+  try
+    lvEdelmetall.Items.Clear;
+
+    Q := TFDQuery.Create(nil);
+    SubItems := TStringList.Create;
+    try
+      Q.Connection := FDConnection1;
+
+      // Nur noch nicht verkaufte Ankäufe, bereits sortiert
+      Q.SQL.Text :=
+        'SELECT id, Ankaufsdatum, Ankaufswert, Karat, Gewicht ' +
+        'FROM ankaufEdelmetall ' +
+        'WHERE verkaufID IS NULL ' +
+        'ORDER BY Ankaufsdatum DESC';
+
+      Q.Open;
+
+      while not Q.Eof do
+      begin
+        Item := lvEdelmetall.Items.Add;
+        Item.Caption := '';
+
+        SubItems.Clear;
+
+        Ankaufsdatum := Q.FieldByName('Ankaufsdatum').AsString;
+        Ankaufswert := Q.FieldByName('Ankaufswert').AsLargeInt;
+        Gewicht := Q.FieldByName('Gewicht').AsLargeInt;
+
+        SubItems.Add(Q.FieldByName('id').AsString);
+        SubItems.Add(SQLiteDateToDisplay(Ankaufsdatum));
+        SubItems.Add(Int100ToDecimalString(Ankaufswert));
+        SubItems.Add(Q.FieldByName('Karat').AsString);
+
+        if Q.FieldByName('Gewicht').IsNull then
+          SubItems.Add('')
+        else
+          SubItems.Add(Int100ToDecimalString(Gewicht));
+
+        Item.SubItems.AddStrings(SubItems);
+
+        Q.Next;
+      end;
+
+    finally
+      Q.Free;
+      SubItems.Free;
+    end;
+
+  finally
+    lvEdelmetall.Items.EndUpdate;
+  end;
+
+  LastSorted := 1;
+end;
+
+
+
+
+
+procedure TfMain.LoadEdelmetallVerkaufToListView;
+var
+  Q: TFDQuery;
+  Item: TListItem;
+  SubItems: TStringList;
+  Verkaufsdatum: string;
+  Verkaufswert, Steuerbetrag: Int64;
+begin
+  lvEdelmetallVerkauf.Items.BeginUpdate;
+  try
+    lvEdelmetallVerkauf.Items.Clear;
+
+    Q := TFDQuery.Create(nil);
+    SubItems := TStringList.Create;
+    try
+      Q.Connection := FDConnection1;
+
+      // Alle Sammelverkäufe, bereits sortiert
+      Q.SQL.Text :=
+        'SELECT id, RechnungsNr, Verkaufsdatum, Verkaufswert, Steuerbetrag ' +
+        'FROM verkaufEdelmetall ' +
+        'ORDER BY Verkaufsdatum DESC';
+
+      Q.Open;
+
+      while not Q.Eof do
+      begin
+        Item := lvEdelmetallVerkauf.Items.Add;
+
+        SubItems.Clear;
+
+        Verkaufsdatum := Q.FieldByName('Verkaufsdatum').AsString;
+        Verkaufswert := Q.FieldByName('Verkaufswert').AsLargeInt;
+        Steuerbetrag := Q.FieldByName('Steuerbetrag').AsLargeInt;
+
+        Item.Caption := Q.FieldByName('id').AsString;
+        SubItems.Add(Q.FieldByName('RechnungsNr').AsString);
+        SubItems.Add(SQLiteDateToDisplay(Verkaufsdatum));
+        SubItems.Add(Int100ToDecimalString(Verkaufswert));
+        SubItems.Add(Int100ToDecimalString(Steuerbetrag));
+
+        Item.SubItems.AddStrings(SubItems);
+
+        Q.Next;
+      end;
+
+    finally
+      Q.Free;
+      SubItems.Free;
+    end;
+
+  finally
+    lvEdelmetallVerkauf.Items.EndUpdate;
+  end;
+
+  LastSorted := 1;
+end;
+
+
+
+
+
+procedure TfMain.LoadInventarToListViewBySuchbegriff(Spalte, Suchbegriff: string);
+var
+  Q: TFDQuery;
+  Item: TListItem;
+  DatumDT: TDateTime;
+begin
+  // ===== Eingaben prüfen =====
+  if Spalte = '' then
+  begin
+    ShowMessage('Bitte Spalte auswählen');
+    Exit;
+  end;
+
+  if Suchbegriff = '' then
+  begin
+    LoadInventarToListView;
+    Exit;
+  end;
+
+  if not IsAllowedColumn(Spalte) then
+  begin
+    ShowMessage('Ungültige Spalte');
+    Exit;
+  end;
+
+  lvInventar.Items.BeginUpdate;
+  try
+    lvInventar.Items.Clear;
+
+    Q := TFDQuery.Create(nil);
+    try
+      Q.Connection := FDConnection1;
+      Q.SQL.Text :=
+        'SELECT id, ' +
+        'CAST(Einkaufsdatum AS TEXT) AS Einkaufsdatum, ' +
+        'CAST(Verkaufsdatum AS TEXT) AS Verkaufsdatum, ' +
+        'SKU, Einheit, Einkaufswert, EinkaufBemerkung, ' +
+        'Verkaufswert, VerkaufBemerkung, Steuerbetrag, RechnungsNr, AnkaufformularID ' +
+        'FROM inventar ' +
+        'WHERE ' + Spalte + ' LIKE :SUCHBEGRIFF || ''%'' ' +
+        'ORDER BY Einkaufsdatum ASC';
+
+      // ===== Parameter setzen =====
+      if SameText(Spalte, 'Einkaufsdatum') or SameText(Spalte, 'Verkaufsdatum') then
+      begin
+        if TryStrToDate(Suchbegriff, DatumDT) then
+          Q.ParamByName('SUCHBEGRIFF').AsString := DateTimeToSQLiteDate(DatumDT)
+        else
+        begin
+          ShowMessage('Datum muss im Format TT.MM.JJJJ eingegeben werden');
+          Exit;
+        end;
+      end
+      else
+        Q.ParamByName('SUCHBEGRIFF').AsString := Suchbegriff;
+
+      Q.Open;
+
+      // ===== Ergebnisse in ListView =====
+      while not Q.Eof do
+      begin
+        Item := lvInventar.Items.Add;
+        Item.Caption := Q.FieldByName('id').AsString;
+
+        Item.SubItems.Add(SQLiteDateToDisplay(Q.FieldByName('Einkaufsdatum').AsString));
+        Item.SubItems.Add(Q.FieldByName('SKU').AsString);
+        Item.SubItems.Add(Q.FieldByName('Einheit').AsString);
+
+        Item.SubItems.Add(Int100ToDecimalString(Q.FieldByName('Einkaufswert').AsLargeInt));
+        Item.SubItems.Add(Q.FieldByName('EinkaufBemerkung').AsString);
+
+        Item.SubItems.Add(SQLiteDateToDisplay(Q.FieldByName('Verkaufsdatum').AsString));
+        Item.SubItems.Add(Int100ToDecimalString(Q.FieldByName('Verkaufswert').AsLargeInt));
+        Item.SubItems.Add(Q.FieldByName('VerkaufBemerkung').AsString);
+
+        Item.SubItems.Add(Int100ToDecimalString(Q.FieldByName('Steuerbetrag').AsLargeInt));
+        Item.SubItems.Add(Q.FieldByName('RechnungsNr').AsString);
+        Item.SubItems.Add(Q.FieldByName('AnkaufformularID').AsString);
+
+        Q.Next;
+      end;
+
+    finally
+      Q.Free;
+    end;
+  finally
+    lvInventar.Items.EndUpdate;
+  end;
+end;
+
+
+
+
+
+
+
+procedure TfMain.lvEdelmetallCheckboxClick(Sender: TObject; iItem: Integer; State: Boolean);
+var
+  i: Integer;
+  AllChecked: Boolean;
+begin
+  if FUpdatingChecks then
+    Exit;
+
+  FUpdatingChecks := True;
+  try
+    AllChecked := True;
+
+    for i := 0 to lvEdelmetall.Items.Count - 1 do
+      if not lvEdelmetall.Items[i].Checked then
+      begin
+        AllChecked := False;
+        Break;
+      end;
+
+    cbCheckUncheckAll.Checked := AllChecked;
+
+  finally
+    FUpdatingChecks := False;
+  end;
+end;
+
+
+
+
+
+procedure TfMain.lvEdelmetallVerkaufDblClick(Sender: TObject);
+var
+  i: integer;
+begin
+  i := lvEdelmetallVerkauf.ItemIndex;
+  if i <> -1 then
+  begin
+    fSammelverkaeufe.VERKAUFID := StrToInt(lvEdelmetallVerkauf.Items[i].Caption);
+    fSammelverkaeufe.Show;
+  end;
+end;
+
+
+
+
+procedure TfMain.lvInventarChange(Sender: TObject; Item: TListItem; Change: TItemChange);
+begin
+  StatusBar1.Panels[1].Text := 'Einträge gesamt: ' + IntToStr(lvInventar.GetCount);
+  UpdateExportPanelVisibility;
+
+  AktualisiereAndShowStatistik;
+end;
+
+
+
+
+
+procedure TfMain.lvInventarColumnClick(Sender: TObject; Column: TListColumn);
+begin
+  lvColumnClickForSort(Sender, Column);
+end;
+
+
+
+
+
+procedure TfMain.lvInventarCompare(Sender: TObject; Item1, Item2: TListItem; Data: Integer; var Compare: Integer);
+begin
+  lvCompareForSort(Sender, Item1, Item2, Data, Compare);
+end;
+
+
+
+
+
+procedure TfMain.lvInventarEdited(Sender: TObject; Item: TListItem; var S: string);
+begin
+  ListViewDirty := True;
+end;
+
+
+
+
+
+procedure TfMain.lvInventarMouseDown(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+var
+  i: integer;
+begin
+  i := lvInventar.ItemIndex;
+  if(i <> -1) then
+  begin
+    if (Button = mbLeft) and (ssDouble in Shift) then
+    begin
+      if ssCtrl in Shift then
+      begin
+       //Doppelklick bei gedrückter Strg Taste
+
+       //Wenn AnkaufformularID = 0 dann
+        if(lvInventar.Items[i].SubItems[10] = '0') then
+        begin
+          //Wareneinkauf
+          fEditWareneinkauf.ENTRYID := StrToInt(lvInventar.Items[i].Caption);
+          fEditWareneinkauf.ShowModal;
+        end
+        else
+        begin
+          //Kundenankauf
+          fEditKundenankauf.ENTRYID := StrToInt(lvInventar.Items[i].Caption);
+          fEditKundenankauf.ShowModal;
+        end;
+      end
+      else
+      begin
+        // Normaler Doppelklick - Warenverkauf
+        uVerkauf.ENTRYID := StrToInt(lvInventar.Items[i].Caption);
+        fVerkauf.ShowModal;
+      end;
+    end;
+  end
+  else
+    exit;
+end;
+
+
+
+
+
+
+procedure TfMain.mZahlungsartenClick(Sender: TObject);
+begin
+  fZahlungsarten.Show;
+end;
+
+
+
+
+
+procedure TfMain.mUpdateClick(Sender: TObject);
+begin
+  //Prüfen ob eine Internetverbindung besteht
+  CheckInternetAsync(WebsiteURL, procedure(IsOnline: Boolean)
+  begin
+    //Internetverbindung besteht
+    if IsOnline then
+    begin
+      //Prüfen ob ein Update vorhanden ist
+      CheckAndUpdateIfAvailableAsync(PROGRAMMVERSION); // z.B. '1.0.0.7'
+    end
+    else
+    begin
+      ShowMessage('Keine Internetverbindung. Die Updateprüfung wird abgebrochen.');
+    end;
+  end);
+end;
+
+
+
+
+
+procedure TfMain.mZustaendeClick(Sender: TObject);
+begin
+  fZustaende.Show;
+end;
+
+
+
+procedure TfMain.N8Click(Sender: TObject);
+begin
+  fEdelmetallSammelverkauf.Show;
+end;
+
+
+
+
+
+procedure TfMain.Programmeinstellungen1Click(Sender: TObject);
+begin
+  fSettings.show;
+end;
+
+
+
+
+procedure TfMain.Shortcuts1Click(Sender: TObject);
+begin
+  if(FileExists(TPath.Combine(PATHHELP, 'Tastaturkuerzel.rtf'))) then
+  begin
+    fHelp.RichEdit1.Lines.LoadFromFile(TPath.Combine(PATHHELP, 'Tastaturkuerzel.rtf'));
+    fHelp.pnlTitel.Caption := 'Tastaturkürzel';
+    fHelp.Width := 573;
+    fHelp.Height := 735;
+    fHelp.Show;
+  end
+  else
+  begin
+    showmessage('Die Datei "HILFE\Tastaturkuerzel.rtf"' + ' wurde nicht gefunden');
+  end;
+end;
+
+
+
+
+procedure TfMain.Sicherungerstellen1Click(Sender: TObject);
+var
+  ini: TIniFile;
+begin
+  CreateManualDatabaseDump(FDConnection1);
+
+  ini := TIniFile.Create(PATH + 'settings.ini');
+  try
+    ini.WriteString('DBDUMP','LastManualDatabaseDump', DateTimeToStr(Now));
+  finally
+    ini.Free;
+  end;
+  StatusBar1.Panels[3].Text := 'Letzte manuelle Datenbanksicherung: ' + ini.ReadString('DBDUMP','LastManualDatabaseDump', 'Nie');
+end;
+
+
+
+
+procedure TfMain.Sicherungerstellen2Click(Sender: TObject);
+begin
+  RestoreDatabaseFromBackup(FDConnection1);
+
+  LoadInventarToListView;
+end;
+
+
+
+
+
+procedure TfMain.tmStatusBarTimer(Sender: TObject);
+begin
+  tmHinweis.Enabled := SHOWHINWEISFENSTER;
+
+  if(SHOWHINWEISFENSTER) then
+  begin
+    pnlHinweis.Height := 130;
+  end
+  else
+  begin
+    pnlHinweis.Height := 0;
+  end;
+
+  Statusbar1.Panels[0].Text := DateToStr(Now)+', ' + TimeToStr(Now) + ' Uhr';
+end;
+
+
+
+
+
+procedure TfMain.tmHinweisTimer(Sender: TObject);
+begin
+  Inc(FHinweisIndex);
+
+  if FHinweisIndex >= Length(FHinweise) then
+    FHinweisIndex := 0;
+
+  lbHinweis.Caption := FHinweise[FHinweisIndex];
+end;
+
+
+
+
+
+procedure TfMain.ToolButton1Click(Sender: TObject);
+begin
+  fWareneinkauf.Show;
+end;
+
+
+
+
+initialization
+  WebsiteURL  := 'https://programme.ensacom.de/AlexanderKeller/Inventarliste/Version2/';
+  ScriptURL   := WebsiteURL + 'scripts/';
+  HilfeURL    := WebsiteURL + 'hilfe/';
+  UpdateURL   := WebsiteURL + 'update/';
+  ProgrammURL := WebsiteURL + 'website/';
+  ProgrammShortURL := 'https://programme.ensacom.de/Inventarliste';
+
+
+
+
+end.
+

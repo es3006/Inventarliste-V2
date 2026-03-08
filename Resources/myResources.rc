@@ -1,0 +1,23 @@
+SQLITE3DLL64BIT RCDATA ".\dlls\sqlite3.DLL"
+SSLEAY32 RCDATA ".\dlls\ssleay32.DLL"
+LIBEAY32 RCDATA ".\dlls\libeay32.DLL"
+
+EXCELIMPORT RCDATA ".\rtf\Inventarliste_als_Exceldatei_importieren.rtf"
+TASTATURKUERZEL RCDATA ".\rtf\Tastaturkuerzel.rtf"
+ANKAUFSFORMULAR RCDATA ".\rtf\Ankaufsformular.rtf"
+
+ANKAUFSFORMULAR_HEADER_UHR TXT ".\Formulare\AnkaufsformularUhr\HEADER_UHR.txt" 
+ANKAUFSFORMULAR_CONTENT_UHR TXT ".\Formulare\AnkaufsformularUhr\CONTENT_UHR.txt"
+ANKAUFSFORMULAR_FOOTER_UHR TXT ".\Formulare\AnkaufsformularUhr\FOOTER_UHR.txt"
+
+
+ANKAUFSFORMULAR_HEADER TXT ".\Formulare\Ankaufsformular\HEADER.txt" 
+ANKAUFSFORMULAR_CONTENT TXT ".\Formulare\Ankaufsformular\CONTENT.txt"
+ANKAUFSFORMULAR_FOOTER TXT ".\Formulare\Ankaufsformular\FOOTER.txt"
+
+
+landscape RCDATA ".\Scripts\print_landscape.bat"
+portrait RCDATA ".\Scripts\print_portrait.bat"
+html2pdf RCDATA ".\Scripts\printHtmlAsPDF.bat"
+wkhtmltopdfexe RCDATA ".\Scripts\wkhtmltopdf.exe"
+wkhtmltoxdll RCDATA ".\Scripts\wkhtmltox.dll"

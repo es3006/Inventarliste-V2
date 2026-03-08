@@ -1,0 +1,163 @@
+﻿unit uSQLiteDateHelper;
+
+interface
+
+uses
+  System.SysUtils, Vcl.ComCtrls, FireDAC.Stan.Param;
+
+// Konvertierung
+function DateTimeToSQLiteDate(const ADate: TDateTime): string;
+function SQLiteDateToDateTime(const AValue: string; out ADate: TDateTime): Boolean;
+function SQLiteDateToDisplay(const AValue: string): string;
+function DisplayDateToSQLiteDate(const ADisplayDate: string): string;
+
+// Validierung
+function IsValidDisplayDate(const ADisplayDate: string): Boolean;  // ← NEU
+
+// DateTimePicker
+procedure SetSQLiteDateParam(const AParam: TFDParam; const ADTP: TDateTimePicker);
+procedure LoadSQLiteDateToDTP(const AValue: string; const ADTP: TDateTimePicker);
+procedure LoadDisplayDateToDTP(const AValue: string; const ADTP: TDateTimePicker);
+
+implementation
+
+
+
+function DateTimeToSQLiteDate(const ADate: TDateTime): string;
+begin
+  Result := FormatDateTime('yyyy-mm-dd', ADate);
+end;
+
+function SQLiteDateToDateTime(const AValue: string; out ADate: TDateTime): Boolean;
+var
+  Y, M, D: Word;
+begin
+  Result := False;
+  if Trim(AValue) = '' then Exit;
+  if (Length(AValue) <> 10) or (AValue[5] <> '-') or (AValue[8] <> '-') then Exit;
+  try
+    Y := StrToInt(Copy(AValue, 1, 4));
+    M := StrToInt(Copy(AValue, 6, 2));
+    D := StrToInt(Copy(AValue, 9, 2));
+    ADate := EncodeDate(Y, M, D);
+    Result := True;
+  except
+    Result := False;
+  end;
+end;
+
+function SQLiteDateToDisplay(const AValue: string): string;
+var
+  DT: TDateTime;
+begin
+  if SQLiteDateToDateTime(AValue, DT) then
+    Result := FormatDateTime('dd.mm.yyyy', DT)
+  else
+    Result := '';
+end;
+
+// ========== NEU HINZUFÜGEN ==========
+/// <summary>
+/// Konvertiert ein Datum vom Anzeigeformat (dd.mm.yyyy) ins SQLite-Format (yyyy-mm-dd)
+/// </summary>
+/// <param name="ADisplayDate">Datum im Format dd.mm.yyyy (z.B. "12.02.2025")</param>
+/// <returns>Datum im Format yyyy-mm-dd (z.B. "2025-02-12") oder '' bei ungültigem Datum</returns>
+function DisplayDateToSQLiteDate(const ADisplayDate: string): string;
+var
+  DT: TDateTime;
+  FS: TFormatSettings;
+begin
+  Result := '';
+  if Trim(ADisplayDate) = '' then
+    Exit;
+
+  FS := TFormatSettings.Create;
+  FS.DateSeparator := '.';
+  FS.ShortDateFormat := 'dd.mm.yyyy';
+
+  if TryStrToDate(ADisplayDate, DT, FS) then
+    Result := DateTimeToSQLiteDate(DT);
+end;
+// ====================================
+
+procedure SetSQLiteDateParam(const AParam: TFDParam; const ADTP: TDateTimePicker);
+begin
+  if ADTP.Checked then
+    AParam.AsString := DateTimeToSQLiteDate(ADTP.Date)
+  else
+    AParam.Clear;
+end;
+
+procedure LoadSQLiteDateToDTP(const AValue: string; const ADTP: TDateTimePicker);
+var
+  DT: TDateTime;
+begin
+  if SQLiteDateToDateTime(AValue, DT) then
+  begin
+    ADTP.Date := DT;
+    ADTP.Checked := True;
+  end
+  else
+  begin
+    ADTP.Date := Now;
+    ADTP.Checked := False;
+  end;
+end;
+
+procedure LoadDisplayDateToDTP(const AValue: string; const ADTP: TDateTimePicker);
+var
+  DT: TDateTime;
+  FS: TFormatSettings;
+begin
+  FS := TFormatSettings.Create;
+  FS.DateSeparator := '.';
+  FS.ShortDateFormat := 'dd.mm.yyyy';
+  if (AValue <> '') and TryStrToDate(AValue, DT, FS) then
+  begin
+    ADTP.Date := DT;
+    ADTP.Checked := True;
+  end
+  else
+  begin
+    ADTP.Date := Now;
+    ADTP.Checked := False;
+  end;
+end;
+
+
+
+
+
+
+/// <summary>
+/// Prüft ob ein String ein gültiges Datum im Anzeigeformat ist
+/// Unterstützt: dd.mm.yyyy und dd.mm.yy
+/// </summary>
+function IsValidDisplayDate(const ADisplayDate: string): Boolean;
+var
+  DT: TDateTime;
+  FS: TFormatSettings;
+begin
+  if Trim(ADisplayDate) = '' then
+    Exit(False);
+
+  FS := TFormatSettings.Create;
+  FS.DateSeparator := '.';
+
+  // 1. Versuch: 4-stelliges Jahr (dd.mm.yyyy)
+  FS.ShortDateFormat := 'dd.mm.yyyy';
+  if TryStrToDate(ADisplayDate, DT, FS) then
+    Exit(True);
+
+  // 2. Versuch: 2-stelliges Jahr (dd.mm.yy)
+  FS.ShortDateFormat := 'dd.mm.yy';
+  Result := TryStrToDate(ADisplayDate, DT, FS);
+end;
+
+
+
+
+
+
+end.
+

@@ -1,0 +1,98 @@
+﻿unit uMoneyHelper;
+
+interface
+
+uses
+  System.SysUtils, Vcl.StdCtrls, Vcl.ExtCtrls;
+
+/// Konvertiert einen String im Euro-Format (z. B. '12,34') in Cent als Int64
+function EuroStringToCent(const EuroText: string): Int64;
+
+/// Liest den Text aus einem TLabeledEdit und konvertiert ihn in Cent
+function EditTextToCent(const Edit: TLabeledEdit): Int64;
+
+/// Konvertiert Cent (Int64) zurück in Euro-String mit 2 Nachkommastellen
+function CentToEuro(const Cent: Int64): string;
+
+
+function IsValidEuroAmount(const S: string): Boolean;
+
+
+implementation
+
+
+
+
+
+/// Konvertiert einen String im Euro-Format (z. B. '12,34') in Cent als Int64
+function EuroStringToCent(const EuroText: string): Int64;
+var
+  T: string;
+  F: Double;
+begin
+  T := Trim(EuroText);
+  if T = '' then
+    Exit(0);
+
+  // Alle Währungszeichen, Leerzeichen und Punkte/Kommas sauber umwandeln
+  T := StringReplace(T, '€', '', [rfReplaceAll]);
+  T := StringReplace(T, 'EUR', '', [rfReplaceAll, rfIgnoreCase]);
+  T := StringReplace(T, ' ', '', [rfReplaceAll]);
+  T := StringReplace(T, '.', '', [rfReplaceAll]);    // Tausenderpunkt entfernen
+  T := StringReplace(T, ',', '.', [rfReplaceAll]);   // Komma als Dezimaltrennzeichen
+
+  if not TryStrToFloat(T, F, TFormatSettings.Invariant) then
+    Exit(0);
+
+  Result := Round(F * 100);
+end;
+
+
+
+
+/// Liest den Text aus einem TLabeledEdit und konvertiert ihn in Cent
+function EditTextToCent(const Edit: TLabeledEdit): Int64;
+begin
+  if Edit = nil then
+    Exit(0);
+
+  // Einfach den Text an die zentrale Funktion weitergeben
+  Result := EuroStringToCent(Edit.Text);
+end;
+
+
+
+
+
+/// Konvertiert Cent (Int64) zurück in Euro-String mit 2 Nachkommastellen
+function CentToEuro(const Cent: Int64): string;
+begin
+  Result := FormatFloat('0.00', Cent / 100);
+end;
+
+
+
+
+
+function IsValidEuroAmount(const S: string): Boolean;
+var
+  T: string;
+  F: Double;
+begin
+  T := Trim(S);
+
+  if T = '' then
+    Exit(False);
+
+  T := StringReplace(T, '€', '', [rfReplaceAll]);
+  T := StringReplace(T, 'EUR', '', [rfReplaceAll, rfIgnoreCase]);
+  T := StringReplace(T, ' ', '', [rfReplaceAll]);
+  T := StringReplace(T, '.', '', [rfReplaceAll]); // Tausender
+  T := StringReplace(T, ',', '.', [rfReplaceAll]); // Dezimal
+
+  Result := TryStrToFloat(T, F, TFormatSettings.Invariant);
+end;
+
+
+end.
+

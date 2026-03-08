@@ -1,0 +1,773 @@
+﻿unit uFunctions;
+
+interface
+
+uses
+  Windows, System.UITypes, System.SysUtils, System.Classes, AnsiStrings, VCL.Forms, IniFiles,
+  IdHTTP, IdSSL, IdSSLOpenSSL, NB30, Dialogs, IdSSLOpenSSLHeaders, IdURI, uLizenzDialog,
+  System.Net.HttpClient, System.JSON, System.DateUtils, System.NetEncoding, System.Hash,
+  Vcl.ComCtrls, System.IOUtils, System.RegularExpressions, StrUtils,
+  Messages, Variants, Graphics, Controls, Math, Menus, System.Zip, StdCtrls,
+  ExtCtrls, ShellApi, FileCtrl, CryptBase, AESObj, MMSystem, VCL.FlexCel.Core,
+  FlexCel.XlsAdapter, Vcl.Imaging.pngimage, IdIcmpClient, IdGlobal, ComObj, uMain,
+  uMoneyHelper, uSQLiteDateHelper;  // ← uSQLiteDateHelper hinzugefügt
+
+// Globale Variablen für ListView-Sortierung
+var
+  ColumnToSort: Integer = 0;
+  LastSorted: Integer = -1;
+  SortDir: Integer = 0;
+
+function HasInternet: Boolean;
+function GetVolumeSerial: string;
+function GetMacAddress: string;
+function GetComputerNameID: string;
+function GetHWID: string;
+
+function GetAppVersion: string;
+function GetFileVersion: string;
+
+function ParseExcelDate(const CellValue: OleVariant; const DefaultDate: TDateTime): TDateTime;
+function TrimEdit(const AEdit: TLabeledEdit): string;
+procedure ClearLabeledEdits(AParent: TWinControl);
+procedure ScrollToRechnungsNr(ListView: TListView; AValue: Integer);
+procedure ClearTempFolder;
+function ReplaceUmlauteWithHtmlEntities(const InputString: string): string;
+procedure CreateHtmlAndPdfFileFromResource(dateiname: string; stl: TStringList; ausrichtung: string = 'print_portrait.bat');
+procedure SpeicherePDFDatei(filename, ZielVerzeichnis: string);
+procedure SaveResourceToFile(ResourceName, FileName: string);
+procedure SelectComboBoxItemByText(CB: TComboBox; const AText: string);
+function IsAllowedColumn(const Col: string): Boolean;
+procedure ExportListViewToCSV(LV: TListView; const Filename: string;
+  const ColumnOrder: array of Integer; const ColumnHeaders: array of string;
+  const Separator: Char = ';');
+procedure OpenCalculator;
+function ExcelEuroToCent(const V: Variant): Int64;
+procedure lvColumnClickForSort(Sender: TObject; Column: TListColumn);
+procedure lvCompareForSort(Sender: TObject; Item1, Item2: TListItem; Data: Integer; var Compare: Integer);
+function IsPureInteger(const S: string): Boolean;
+procedure ShowProgress(const OutputLabel: TLabel; const Msg: string);
+function ReplaceUmlaute(const InputString: string): string;
+function IsUpdateQuestionAllowed(const Ini: TIniFile): Boolean;
+procedure ShowLongText(const ACaption, AText: string);
+function ExtractNumber(const S: string): Integer;
+
+implementation
+
+function Netbios(p: PNCB): Byte; stdcall; external 'netapi32.dll';
+
+// ===== OPTIMIERT: Nutzt Helper-Funktionen =====
+function ParseExcelDate(const CellValue: OleVariant; const DefaultDate: TDateTime): TDateTime;
+var
+  DateStr: string;
+  DT: TDateTime;
+begin
+  Result := DefaultDate;
+
+  try
+    if VarIsNull(CellValue) or VarIsEmpty(CellValue) then
+      Exit;
+
+    DateStr := Trim(VarToStr(CellValue));
+    if DateStr = '' then
+      Exit;
+
+    // Fall 1: Excel-Datum als Zahl (OLE-Datum)
+    if VarIsNumeric(CellValue) then
+    begin
+      Result := CellValue;
+      Exit;
+    end;
+
+    // Fall 2: Datum als String im Format dd.mm.yyyy
+    DateStr := DisplayDateToSQLiteDate(DateStr);
+    if DateStr <> '' then
+    begin
+      if SQLiteDateToDateTime(DateStr, DT) then
+        Result := DT;
+    end;
+  except
+    Result := DefaultDate;
+  end;
+end;
+
+function TrimEdit(const AEdit: TLabeledEdit): string;
+begin
+  Result := Trim(AEdit.Text);
+end;
+
+procedure ClearLabeledEdits(AParent: TWinControl);
+var
+  i: Integer;
+begin
+  for i := 0 to AParent.ControlCount - 1 do
+  begin
+    if AParent.Controls[i] is TLabeledEdit then
+      TLabeledEdit(AParent.Controls[i]).Clear
+    else if AParent.Controls[i] is TWinControl then
+      ClearLabeledEdits(TWinControl(AParent.Controls[i]));
+  end;
+end;
+
+function HasInternet: Boolean;
+begin
+  try
+    with TIdHTTP.Create(nil) do
+    try
+      ConnectTimeout := 2000;
+      ReadTimeout := 2000;
+      Head('https://www.google.com');
+      Result := True;
+    finally
+      Free;
+    end;
+  except
+    Result := False;
+  end;
+end;
+
+// ===== OPTIMIERT: Robustere ISO 8601 Konvertierung =====
+function ISO8601ToDate(const S: string): TDate;
+var
+  DT: TDateTime;
+begin
+  // ISO 8601 Format: yyyy-mm-dd
+  if SQLiteDateToDateTime(S, DT) then
+    Result := Trunc(DT)
+  else
+    Result := 0;
+end;
+
+function VerifyLicenseOnline(const Email, Code, HWID: string): TDate;
+var
+  HTTP: TIdHTTP;
+  SSL: TIdSSLIOHandlerSocketOpenSSL;
+  Resp: string;
+begin
+  HTTP := TIdHTTP.Create(nil);
+  SSL := TIdSSLIOHandlerSocketOpenSSL.Create(nil);
+  try
+    HTTP.IOHandler := SSL;
+    Resp := HTTP.Get('https://deinserver/check_license.php?email=' +
+                     TIdURI.ParamsEncode(Email) +
+                     '&code=' + TIdURI.ParamsEncode(Code) +
+                     '&hwid=' + HWID +
+                     '&app=DEINAPP');
+    if Resp.StartsWith('OK|') then
+      Result := ISO8601ToDate(Copy(Resp, 4))
+    else
+      raise Exception.Create('Lizenz ungültig: ' + Resp);
+  finally
+    SSL.Free;
+    HTTP.Free;
+  end;
+end;
+
+function GetVolumeSerial: string;
+var
+  VolumeSerial: DWORD;
+  Dummy1, Dummy2: DWORD;
+  VolName, FSName: array[0..MAX_PATH] of Char;
+begin
+  if GetVolumeInformation('C:\', VolName, MAX_PATH,
+    @VolumeSerial, Dummy1, Dummy2, FSName, MAX_PATH) then
+    Result := IntToHex(VolumeSerial, 8)
+  else
+    Result := '00000000';
+end;
+
+function GetMacAddress: string;
+var
+  Adapter: TAdapterStatus;
+  NCB: TNCB;
+  LanaEnum: TLanaEnum;
+  i: Integer;
+begin
+  Result := '';
+  FillChar(NCB, SizeOf(NCB), 0);
+  NCB.ncb_command := AnsiChar(NCBENUM);
+  NCB.ncb_buffer := @LanaEnum;
+  NCB.ncb_length := SizeOf(LanaEnum);
+
+  if Netbios(@NCB) <> 0 then Exit;
+
+  for i := 0 to Ord(LanaEnum.length) - 1 do
+  begin
+    FillChar(NCB, SizeOf(NCB), 0);
+    NCB.ncb_command := AnsiChar(NCBRESET);
+    NCB.ncb_lana_num := LanaEnum.lana[i];
+    if Netbios(@NCB) <> 0 then Continue;
+
+    FillChar(NCB, SizeOf(NCB), 0);
+    NCB.ncb_command := AnsiChar(NCBASTAT);
+    NCB.ncb_lana_num := LanaEnum.lana[i];
+    AnsiStrings.StrPCopy(NCB.ncb_callname, '*');
+    NCB.ncb_buffer := @Adapter;
+    NCB.ncb_length := SizeOf(Adapter);
+
+    if Netbios(@NCB) = 0 then
+    begin
+      Result := Format('%.2X-%.2X-%.2X-%.2X-%.2X-%.2X', [
+        Byte(Adapter.adapter_address[0]),
+        Byte(Adapter.adapter_address[1]),
+        Byte(Adapter.adapter_address[2]),
+        Byte(Adapter.adapter_address[3]),
+        Byte(Adapter.adapter_address[4]),
+        Byte(Adapter.adapter_address[5])
+      ]);
+      Exit;
+    end;
+  end;
+
+  if Result = '' then
+    Result := '00-00-00-00-00-00';
+end;
+
+function GetComputerNameID: string;
+var
+  Buffer: array[0..MAX_COMPUTERNAME_LENGTH + 1] of Char;
+  Size: DWORD;
+begin
+  Size := Length(Buffer);
+  if GetComputerName(Buffer, Size) then
+    Result := string(Buffer)
+  else
+    Result := 'UnknownPC';
+end;
+
+function GetHWID: string;
+begin
+  Result := Format('%s-%s-%s',
+    [GetVolumeSerial, GetMacAddress, GetComputerNameID]);
+end;
+
+procedure ScrollToRechnungsNr(ListView: TListView; AValue: Integer);
+var
+  Item: TListItem;
+begin
+  for Item in ListView.Items do
+  begin
+    if StrToIntDef(Item.Caption, -1) = AValue then
+    begin
+      ListView.Selected := Item;
+      Item.Focused := True;
+      Item.MakeVisible(False);
+      Break;
+    end;
+  end;
+end;
+
+procedure ClearTempFolder;
+var
+  TempPath: string;
+  FileName: string;
+begin
+  TempPath := TPath.Combine(
+    ExtractFilePath(ParamStr(0)),
+    'TEMP'
+  );
+
+  if not TDirectory.Exists(TempPath) then
+    Exit;
+
+  for FileName in TDirectory.GetFiles(TempPath) do
+    TFile.Delete(FileName);
+
+  for FileName in TDirectory.GetDirectories(TempPath) do
+    TDirectory.Delete(FileName, True);
+end;
+
+function ReplaceUmlauteWithHtmlEntities(const InputString: string): string;
+begin
+  Result := StringReplace(InputString, 'ä', '&auml;', [rfReplaceAll, rfIgnoreCase]);
+  Result := StringReplace(Result, 'Ä', '&Auml;', [rfReplaceAll, rfIgnoreCase]);
+  Result := StringReplace(Result, 'ö', '&ouml;', [rfReplaceAll, rfIgnoreCase]);
+  Result := StringReplace(Result, 'Ö', '&Ouml;', [rfReplaceAll, rfIgnoreCase]);
+  Result := StringReplace(Result, 'ü', '&uuml;', [rfReplaceAll, rfIgnoreCase]);
+  Result := StringReplace(Result, 'Ü', '&Uuml;', [rfReplaceAll, rfIgnoreCase]);
+  Result := StringReplace(Result, 'ß', '&szlig;', [rfReplaceAll, rfIgnoreCase]);
+end;
+
+procedure ShowLongText(const ACaption, AText: string);
+var
+  F: TForm;
+  M: TMemo;
+begin
+  F := TForm.Create(nil);
+  try
+    F.Caption := ACaption;
+    F.Width := 700;
+    F.Height := 200;
+    F.Position := poScreenCenter;
+
+    M := TMemo.Create(F);
+    M.Parent := F;
+    M.Align := alClient;
+    M.ReadOnly := True;
+    M.ScrollBars := ssBoth;
+    M.WordWrap := False;
+    M.Text := AText;
+
+    F.ShowModal;
+  finally
+    F.Free;
+  end;
+end;
+
+procedure CreateHtmlAndPdfFileFromResource(dateiname: string; stl: TStringList; ausrichtung: string = 'print_portrait.bat');
+var
+  MaxWaitTime: Integer;
+  WaitInterval: Integer;
+  TotalWaitTime: Integer;
+  ScriptDatei, HtmlFile, PdfFile: string;
+  CommandLine: string;
+begin
+  dateiname := ReplaceUmlaute(dateiname);
+
+  ScriptDatei := TPath.Combine(PATHSCRIPTS, ausrichtung);
+  HtmlFile    := TPath.Combine(PATHTEMP, dateiname + '.html');
+  PdfFile     := dateiname + '.pdf';
+
+  stl.SaveToFile(HTMLFile);
+
+  if not FileExists(HTMLFile) then
+  begin
+    ShowLongText('Datei konnte nicht erzeugt werden', HTMLFile);
+    Exit;
+  end;
+
+  CommandLine := Format('"%s" "%s"', [HtmlFile, PdfFile]);
+
+  if ShellExecute(0, 'open', PChar(ScriptDatei), PChar(CommandLine), '', SW_HIDE) <= 32 then
+  begin
+    ShowMessage('Fehler beim Ausführen des Skripts zum erzeugen des PDF Formulars.');
+  end;
+
+  MaxWaitTime   := 10000;
+  WaitInterval  := 1000;
+  TotalWaitTime := 0;
+
+  while not FileExists(PdfFile) do
+  begin
+    Sleep(WaitInterval);
+    TotalWaitTime := TotalWaitTime + WaitInterval;
+    if TotalWaitTime >= MaxWaitTime then
+    begin
+      ShowMessage('Fehler: Das erzeugen der PDF-Datei hat zu lang gedauert.');
+      Exit;
+    end;
+  end;
+
+  if MessageDlg('Ankaufformular erfolgreich erzeugt.' + sLineBreak +
+       'Möchten Sie das Ankaufformular im Datei-Explorer anzeigen?',
+       mtConfirmation, [mbYes, mbNo], 0) = mrYes then
+  begin
+    if FileExists(PdfFile) then
+      ShellExecute(0, 'open', 'explorer.exe', PChar('/select,"' + PdfFile + '"'), nil, SW_SHOWNORMAL);
+  end;
+
+  if FileExists(HTMLFile) then
+    DeleteFile(HTMLFile);
+end;
+
+function ShortPath(const LongPath: string): string;
+var
+  Buffer: array[0..MAX_PATH] of Char;
+begin
+  if GetShortPathName(PChar(LongPath), Buffer, MAX_PATH) > 0 then
+    Result := string(Buffer)
+  else
+    Result := LongPath;
+end;
+
+procedure SpeicherePDFDatei(filename, ZielVerzeichnis: string);
+var
+  SaveDialog: TSaveDialog;
+begin
+  filename := ReplaceUmlaute(filename);
+
+  if not FileExists(PATHTEMP + '\' + filename + '.pdf') then
+  begin
+    ShowMessage('Die temporäre Datei wurde nicht gefunden:' + sLineBreak + filename);
+    Exit;
+  end;
+
+  if not DirectoryExists(ZielVerzeichnis) then
+  begin
+    if MessageDlg('Bitte geben Sie in den Einstellungen den Pfad an, unter dem Sie die Datei ' + filename + ' abspeichern wollen!' + sLineBreak + sLineBreak + 'Wollen Sie den Pfad jetzt angeben?', mtConfirmation, [mbYes, mbNo], 0, mbYes) = mrYes then
+    begin
+      ShowMessage('ANPASSEN in uFunctions');
+      Exit;
+    end
+    else
+      Exit;
+  end;
+
+  SaveDialog := TSaveDialog.Create(nil);
+  try
+    SaveDialog.DefaultExt := 'pdf';
+    SaveDialog.Filter     := 'PDF-Dateien (*.pdf)|*.pdf';
+    SaveDialog.InitialDir := IncludeTrailingPathDelimiter(ZielVerzeichnis);
+    SaveDialog.FileName   := ReplaceUmlaute(filename) + '.pdf';
+
+    if SaveDialog.Execute then
+    begin
+      try
+        TFile.Copy(PATHTEMP + '\' + filename + '.pdf', SaveDialog.FileName, True);
+        ShowMessage('Datei erfolgreich gespeichert unter:' + sLineBreak + SaveDialog.FileName);
+      except
+        on E: Exception do
+          ShowMessage('Fehler beim Speichern der Datei:' + sLineBreak + E.Message);
+      end;
+    end;
+  finally
+    SaveDialog.Free;
+  end;
+end;
+
+function GetAppVersion: string;
+var
+  InfoSize, Wnd: DWORD;
+  VerBuf: Pointer;
+  VerData: Pointer;
+  VerLen: UINT;
+  VerKey: string;
+  FileName: string;
+begin
+  Result := '';
+  FileName := ParamStr(0);
+  InfoSize := GetFileVersionInfoSize(PChar(FileName), Wnd);
+
+  if InfoSize = 0 then Exit;
+
+  GetMem(VerBuf, InfoSize);
+  try
+    if GetFileVersionInfo(PChar(FileName), 0, InfoSize, VerBuf) then
+    begin
+      VerKey := '\';
+      if VerQueryValue(VerBuf, PChar(VerKey), VerData, VerLen) then
+      begin
+        with TVSFixedFileInfo(VerData^) do
+        begin
+          Result := Format('%d.%d.%d.%d',
+            [HiWord(dwFileVersionMS), LoWord(dwFileVersionMS),
+             HiWord(dwFileVersionLS), LoWord(dwFileVersionLS)]);
+        end;
+      end;
+    end;
+  finally
+    FreeMem(VerBuf);
+  end;
+end;
+
+function GetFileVersion: string;
+var
+  VerInfoSize, VerValueSize, Dummy: DWORD;
+  VerInfo: Pointer;
+  VerValue: PVSFixedFileInfo;
+begin
+  VerInfoSize := GetFileVersionInfoSize(PChar(ParamStr(0)), Dummy);
+  if VerInfoSize = 0 then Exit('');
+
+  GetMem(VerInfo, VerInfoSize);
+  try
+    if GetFileVersionInfo(PChar(ParamStr(0)), 0, VerInfoSize, VerInfo) then
+    begin
+      VerQueryValue(VerInfo, '\', Pointer(VerValue), VerValueSize);
+      with VerValue^ do
+        Result := Format('%d.%d.%d.%d', [
+          HiWord(dwFileVersionMS), LoWord(dwFileVersionMS),
+          HiWord(dwFileVersionLS), LoWord(dwFileVersionLS)]);
+    end;
+  finally
+    FreeMem(VerInfo);
+  end;
+end;
+
+procedure SaveResourceToFile(ResourceName, FileName: string);
+var
+  ResStream: TResourceStream;
+  FileStream: TFileStream;
+begin
+  if not FileExists(FileName) then
+  begin
+    ResStream := TResourceStream.Create(HInstance, ResourceName, RT_RCDATA);
+    try
+      FileStream := TFileStream.Create(FileName, fmCreate);
+      try
+        FileStream.CopyFrom(ResStream, 0);
+      finally
+        FileStream.Free;
+      end;
+    finally
+      ResStream.Free;
+    end;
+  end;
+end;
+
+procedure SelectComboBoxItemByText(CB: TComboBox; const AText: string);
+var
+  Index: Integer;
+begin
+  Index := CB.Items.IndexOf(AText);
+  if Index <> -1 then
+    CB.ItemIndex := Index;
+end;
+
+function IsAllowedColumn(const Col: string): Boolean;
+begin
+  Result :=
+    SameText(Col, 'Einkaufsdatum') or
+    SameText(Col, 'Verkaufsdatum') or
+    SameText(Col, 'SKU') or
+    SameText(Col, 'Einheit') or
+    SameText(Col, 'RechnungsNr');
+end;
+
+procedure ExportListViewToCSV(LV: TListView; const Filename: string;
+  const ColumnOrder: array of Integer; const ColumnHeaders: array of string;
+  const Separator: Char = ';');
+var
+  CSVFile: TStringList;
+  i, j: Integer;
+  Line: string;
+  Item: TListItem;
+  Value: string;
+  ini: TIniFile;
+begin
+  if Length(ColumnOrder) <> Length(ColumnHeaders) then
+  begin
+    ShowMessage('ColumnOrder und ColumnHeaders müssen gleich lang sein!');
+    Exit;
+  end;
+
+  CSVFile := TStringList.Create;
+  try
+    Line := '';
+    for j := 0 to High(ColumnHeaders) do
+    begin
+      if j > 0 then Line := Line + Separator;
+      Line := Line + '"' + ColumnHeaders[j] + '"';
+    end;
+    CSVFile.Add(Line);
+
+    for i := 0 to LV.Items.Count - 1 do
+    begin
+      Item := LV.Items[i];
+      Line := '';
+
+      for j := 0 to High(ColumnOrder) do
+      begin
+        if j > 0 then Line := Line + Separator;
+
+        if ColumnOrder[j] = -1 then
+          Value := Item.Caption
+        else if ColumnOrder[j] < Item.SubItems.Count then
+          Value := Item.SubItems[ColumnOrder[j]]
+        else
+          Value := '';
+
+        Line := Line + '"' + Value + '"';
+      end;
+
+      CSVFile.Add(Line);
+    end;
+
+    CSVFile.SaveToFile(Filename, TEncoding.UTF8);
+
+    ini := TIniFile.Create(PATH + 'settings.ini');
+    try
+      ini.WriteInteger('DATENEXPORT', 'LastExport', Trunc(Now));
+      fMain.LoadStatusBarValues;
+    finally
+      ini.Free;
+    end;
+  finally
+    CSVFile.Free;
+
+    if FileExists(Filename) then
+      ShowMessage('Inventarliste wurde erfolgreich exportiert!')
+    else
+      ShowMessage('Beim Export der Inventarliste ist wohl was schief gelaufen!');
+  end;
+end;
+
+procedure OpenCalculator;
+begin
+  ShellExecute(0, 'open', 'ms-calculator:', nil, nil, SW_SHOWNORMAL);
+end;
+
+function ExcelEuroToCent(const V: Variant): Int64;
+var
+  S: string;
+begin
+  Result := 0;
+
+  if VarIsNull(V) or VarIsEmpty(V) then
+    Exit;
+
+  S := Trim(VarToStr(V));
+  if S = '' then
+    Exit;
+
+  Result := DecimalStringToInt100(S);
+end;
+
+procedure lvColumnClickForSort(Sender: TObject; Column: TListColumn);
+begin
+  ColumnToSort := Column.Index;
+  if ColumnToSort = LastSorted then
+    SortDir := 1 - SortDir
+  else
+    SortDir := 0;
+  LastSorted := ColumnToSort;
+
+  if Sender is TCustomListView then
+    (Sender as TCustomListView).AlphaSort;
+end;
+
+procedure lvCompareForSort(Sender: TObject; Item1, Item2: TListItem; Data: Integer; var Compare: Integer);
+var
+  S1, S2: string;
+  F1, F2: Double;
+  Has1, Has2: Boolean;
+  D1, D2: TDateTime;
+  ColTag: Integer;
+  IsEmptyDecision: Boolean;
+begin
+  IsEmptyDecision := False;
+
+  if ColumnToSort = 0 then
+  begin
+    S1 := Trim(Item1.Caption);
+    S2 := Trim(Item2.Caption);
+  end
+  else
+  begin
+    S1 := Trim(Item1.SubItems[ColumnToSort - 1]);
+    S2 := Trim(Item2.SubItems[ColumnToSort - 1]);
+  end;
+
+  ColTag := (Sender as TListView).Columns[ColumnToSort].Tag;
+
+  case ColTag of
+    1, 2: // ZAHLEN
+    begin
+      Has1 := TryStrToFloat(S1, F1);
+      Has2 := TryStrToFloat(S2, F2);
+
+      if not Has1 and not Has2 then
+      begin
+        Compare := 0;
+        IsEmptyDecision := True;
+      end
+      else if not Has1 then
+      begin
+        Compare := 1;
+        IsEmptyDecision := True;
+      end
+      else if not Has2 then
+      begin
+        Compare := -1;
+        IsEmptyDecision := True;
+      end
+      else
+        Compare := CompareValue(F1, F2);
+    end;
+
+    3: // DATUM
+    begin
+      // Nutze Helper für Datum-Parsing
+      Has1 := SQLiteDateToDateTime(DisplayDateToSQLiteDate(S1), D1);
+      Has2 := SQLiteDateToDateTime(DisplayDateToSQLiteDate(S2), D2);
+
+      // Fallback: Versuche mit Zeit-Parsing
+      if not Has1 then
+        Has1 := TryParseDisplayDateTime(S1, D1);
+      if not Has2 then
+        Has2 := TryParseDisplayDateTime(S2, D2);
+
+      if not Has1 and not Has2 then
+      begin
+        Compare := 0;
+        IsEmptyDecision := True;
+      end
+      else if not Has1 then
+      begin
+        Compare := 1;
+        IsEmptyDecision := True;
+      end
+      else if not Has2 then
+      begin
+        Compare := -1;
+        IsEmptyDecision := True;
+      end
+      else
+        Compare := CompareValue(D1, D2);
+    end;
+
+  else
+    Compare := AnsiCompareText(S1, S2);
+  end;
+
+  if (SortDir = 1) and (not IsEmptyDecision) then
+    Compare := -Compare;
+end;
+
+
+function IsPureInteger(const S: string): Boolean;
+var
+  I: Integer;
+begin
+  Result := TryStrToInt(S, I);
+end;
+
+procedure ShowProgress(const OutputLabel: TLabel; const Msg: string);
+begin
+  if Assigned(OutputLabel) then
+  begin
+    OutputLabel.Caption := Msg;
+    Application.ProcessMessages;
+  end;
+end;
+
+function ReplaceUmlaute(const InputString: string): string;
+begin
+  Result := StringReplace(InputString, 'ä', 'ae', [rfReplaceAll, rfIgnoreCase]);
+  Result := StringReplace(Result, 'Ä', 'Ae', [rfReplaceAll, rfIgnoreCase]);
+  Result := StringReplace(Result, 'ö', 'oe', [rfReplaceAll, rfIgnoreCase]);
+  Result := StringReplace(Result, 'Ö', 'Oe', [rfReplaceAll, rfIgnoreCase]);
+  Result := StringReplace(Result, 'ü', 'ue', [rfReplaceAll, rfIgnoreCase]);
+  Result := StringReplace(Result, 'Ü', 'Ue', [rfReplaceAll, rfIgnoreCase]);
+  Result := StringReplace(Result, 'ß', 'ss', [rfReplaceAll, rfIgnoreCase]);
+end;
+
+function IsUpdateQuestionAllowed(const Ini: TIniFile): Boolean;
+var
+  LastAskedDate: Integer;
+begin
+  Result := True;
+
+  if not Ini.ValueExists('UPDATE', 'InstallUpdateQuestion') then
+    Exit;
+
+  LastAskedDate := Ini.ReadInteger('UPDATE', 'InstallUpdateQuestion', 0);
+  Result := (Trunc(Date) - LastAskedDate) >= 7;
+end;
+
+function ExtractNumber(const S: string): Integer;
+var
+  I: Integer;
+begin
+  I := 1;
+
+  while (I <= Length(S)) and not CharInSet(S[I], ['0'..'9']) do
+    Inc(I);
+
+  while (I <= Length(S)) and (S[I] = '0') do
+    Inc(I);
+
+  Result := StrToIntDef(Copy(S, I, MaxInt), 0);
+end;
+
+end.

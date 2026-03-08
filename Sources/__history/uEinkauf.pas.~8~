@@ -1,0 +1,307 @@
+﻿unit uEinkauf;
+
+interface
+
+uses
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
+  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.ComCtrls, Vcl.Mask, System.Math,
+  Vcl.ExtCtrls, Vcl.Buttons, FireDAC.Stan.Param, FireDAC.Phys.SQLite, Data.DB, FireDAC.Comp.DataSet,
+  FireDAC.Comp.Client, FireDAC.Stan.Intf, FireDAC.DApt, Vcl.Imaging.pngimage, DateUtils;
+
+type
+  TfEinkauf = class(TForm)
+    Label1: TLabel;
+    Label3: TLabel;
+    edSKU: TLabeledEdit;
+    edEinkaufswert: TLabeledEdit;
+    edEinkaufBemerkung: TLabeledEdit;
+    dtpEinkaufsdatum: TDateTimePicker;
+    cbEinheiten: TComboBox;
+    edMenge: TLabeledEdit;
+    btnSave: TButton;
+    btnAbort: TButton;
+    Label6: TLabel;
+    edNeueEinheit: TLabeledEdit;
+    Panel1: TPanel;
+    Label7: TLabel;
+    imgTaschenrechner: TImage;
+    edGewicht: TLabeledEdit;
+    edKarat: TLabeledEdit;
+    pnlHint: TPanel;
+    Label4: TLabel;
+    procedure FormShow(Sender: TObject);
+    procedure btnAbortClick(Sender: TObject);
+    procedure btnSaveClick(Sender: TObject);
+    procedure edEinkaufswertKeyPress(Sender: TObject; var Key: Char);
+    procedure imgTaschenrechnerClick(Sender: TObject);
+    procedure imgTaschenrechnerMouseEnter(Sender: TObject);
+    procedure imgTaschenrechnerMouseLeave(Sender: TObject);
+    procedure FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
+    procedure edGewichtExit(Sender: TObject);
+  private
+
+  public
+    { Public-Deklarationen }
+  end;
+
+var
+  fEinkauf: TfEinkauf;
+
+implementation
+
+{$R *.dfm}
+
+uses
+  uFunctions, uDBFunctions, uMain, uSQLiteDateHelper, uMoneyHelper;
+
+
+
+
+procedure TfEinkauf.btnAbortClick(Sender: TObject);
+begin
+  close;
+end;
+
+
+
+
+
+procedure TfEinkauf.btnSaveClick(Sender: TObject);
+var
+  sku, einkaufBemerkung, einheit, neueEinheit: string;
+  einkaufswertCent: Int64;
+  menge, karat, gewichtInt, i: Integer;
+  FDQuery: TFDQuery;
+  temp: Double;
+  DTEinkauf: TDateTime;
+begin
+  // ===== Validierungen =====
+  if Trim(edMenge.Text) = '' then
+  begin
+    ShowMessage('Bitte geben Sie die Menge an!');
+    Exit;
+  end;
+
+  if not TryStrToInt(edMenge.Text, menge) or (menge <= 0) then
+  begin
+    ShowMessage('Die Menge muss eine Zahl größer 0 sein!');
+    Exit;
+  end;
+
+  // ===== Werte aus UI übernehmen =====
+  sku := Trim(edSKU.Text);
+  einkaufBemerkung := Trim(edEinkaufBemerkung.Text);
+  einheit := Trim(cbEinheiten.Text);
+  neueEinheit := Trim(edNeueEinheit.Text);
+
+  // Einkaufswert aus Edit in Cent umwandeln (MoneyHelper)
+  einkaufswertCent := EditTextToCent(edEinkaufswert);
+
+  // Gewicht in Integer (Centimeter * 100)
+  if not TryStrToFloat(trim(edGewicht.Text), temp) then
+    temp := 0;
+  gewichtInt := Round(temp * 100);
+
+  // Karat
+  if not TryStrToInt(trim(edKarat.Text), karat) then
+    karat := 0;
+
+  // Validierungen
+  if sku = '' then
+  begin
+    ShowMessage('Bitte geben Sie die SKU-Nummer ein!');
+    Exit;
+  end;
+
+  if einkaufswertCent <= 0 then
+  begin
+    ShowMessage('Bitte geben Sie einen gültigen Einkaufswert ein!');
+    Exit;
+  end;
+
+  // Datum: prüfen, ob DateTimePicker gecheckt ist
+  DTEinkauf := IfThen(dtpEinkaufsdatum.Checked, dtpEinkaufsdatum.Date, 0);
+
+  // ===== Datenbank eintragen =====
+  FDQuery := TFDQuery.Create(nil);
+  try
+    FDQuery.Connection := fMain.FDConnection1;
+
+    FDQuery.SQL.Text :=
+      'INSERT INTO inventar (' +
+      'Einkaufsdatum, SKU, Einkaufswert, EinkaufBemerkung, ' +
+      'Einheit, Gewicht, Karat' +
+      ') VALUES (' +
+      ':EINKAUFSDATUM, :SKU, :EINKAUFSWERT, :EINKAUFBEMERKUNG, ' +
+      ':EINHEIT, :GEWICHT, :KARAT)';
+
+    fMain.FDConnection1.StartTransaction;
+    try
+      for i := 1 to menge do
+      begin
+        // Datum über Helper-Funktion in SQLite-Format yyyy-mm-dd
+        SetSQLiteDateParam(FDQuery.ParamByName('EINKAUFSDATUM'), dtpEinkaufsdatum);
+
+        FDQuery.ParamByName('SKU').AsString := sku;
+        FDQuery.ParamByName('EINKAUFSWERT').AsLargeInt := einkaufswertCent;
+        FDQuery.ParamByName('EINKAUFBEMERKUNG').AsString := einkaufBemerkung;
+        FDQuery.ParamByName('GEWICHT').AsInteger := gewichtInt;
+        FDQuery.ParamByName('KARAT').AsInteger := karat;
+
+        if neueEinheit <> '' then
+        begin
+          AddEinheitIfNotExists(fMain.FDConnection1, neueEinheit);
+          LoadEinheitenFromDB(fMain.FDConnection1, cbEinheiten);
+          FDQuery.ParamByName('EINHEIT').AsString := neueEinheit;
+        end
+        else
+          FDQuery.ParamByName('EINHEIT').AsString := einheit;
+
+        FDQuery.ExecSQL;
+      end;
+
+      fMain.FDConnection1.Commit;
+    except
+      on E: Exception do
+      begin
+        fMain.FDConnection1.Rollback;
+        raise;
+      end;
+    end;
+  finally
+    FDQuery.Free;
+  end;
+
+  // ===== UI aktualisieren =====
+  fMain.LoadInventarToListView;
+  uMain.ListViewDirty := True;
+
+  Close;
+end;
+
+
+
+
+
+
+
+
+
+
+
+procedure TfEinkauf.edEinkaufswertKeyPress(Sender: TObject; var Key: Char);
+begin
+// Ziffern erlauben
+  if CharInSet(Key, ['0'..'9']) then
+    Exit;
+
+  // Komma erlauben (nur einmal)
+  if (Key = ',') and (Pos(',', (Sender as TLabeledEdit).Text) = 0) then
+    Exit;
+
+  // Backspace erlauben
+  if Key = #8 then
+    Exit;
+
+  // Enter erlauben
+  if Key = #13 then
+    Exit;
+
+  if Key = '.' then
+  begin
+    Key := ',';
+    if Pos(',', (Sender as TLabeledEdit).Text) > 0 then
+      Key := #0;
+    Exit;
+  end;
+
+  if (Key = '-') and ((Sender as TLabeledEdit).SelStart = 0)
+   and (Pos('-', (Sender as TLabeledEdit).Text) = 0) then
+  Exit;
+
+  // Alles andere blockieren
+  Key := #0;
+end;
+
+procedure TfEinkauf.edGewichtExit(Sender: TObject);
+var
+  d: Double;
+  FS: TFormatSettings;
+  Edit: TLabeledEdit;
+begin
+  if not (Sender is TLabeledEdit) then
+    Exit;
+
+  Edit := TLabeledEdit(Sender);
+
+  if Trim(Edit.Text) = '' then
+    Exit;
+
+  FS := TFormatSettings.Create;
+  FS.DecimalSeparator := ',';
+
+  if TryStrToFloat(Trim(Edit.Text), d, FS) then
+    Edit.Text := FormatFloat('0.00', d, FS)
+  else
+  begin
+    ShowMessage('Bitte geben Sie einen gültigen Wert ein.');
+    Edit.SetFocus;
+    Edit.SelectAll;
+  end;
+end;
+
+
+
+
+procedure TfEinkauf.FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
+begin
+  if Key = VK_ESCAPE then
+  begin
+    Key := 0;
+    Close;
+  end;
+end;
+
+
+
+
+
+procedure TfEinkauf.FormShow(Sender: TObject);
+begin
+  LoadEinheitenFromDB(fMain.FDConnection1, cbEinheiten);
+
+  edMenge.Text := '1';
+  edSKU.Text := GetNextSKUFromTable(fMain.FDConnection1, 'inventar', 'TG', 6);
+  dtpEinkaufsdatum.Date := now;
+  edEinkaufswert.Clear;
+  edEinkaufBemerkung.Clear;
+  edNeueEinheit.Clear;
+  cbEinheiten.ItemIndex := -1;
+
+  edMenge.SetFocus;
+end;
+
+procedure TfEinkauf.imgTaschenrechnerClick(Sender: TObject);
+begin
+  OpenCalculator
+end;
+
+procedure TfEinkauf.imgTaschenrechnerMouseEnter(Sender: TObject);
+begin
+  imgTaschenrechner.Left := imgTaschenrechner.Left + 2;
+  imgTaschenrechner.Top := imgTaschenrechner.Top + 2;
+end;
+
+procedure TfEinkauf.imgTaschenrechnerMouseLeave(Sender: TObject);
+begin
+  imgTaschenrechner.Left := imgTaschenrechner.Left - 2;
+  imgTaschenrechner.Top := imgTaschenrechner.Top - 2;
+end;
+
+
+
+
+
+
+
+end.

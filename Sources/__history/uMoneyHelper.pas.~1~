@@ -1,0 +1,59 @@
+﻿unit uMoneyHelper;
+
+interface
+
+uses
+  System.SysUtils, Vcl.StdCtrls, Vcl.ExtCtrls;
+
+/// Konvertiert einen String im Euro-Format (z. B. '12,34') in Cent als Int64
+function EuroStringToCent(const EuroText: string): Int64;
+
+/// Liest den Text aus einem TLabeledEdit und konvertiert ihn in Cent
+function EditTextToCent(const Edit: TLabeledEdit): Int64;
+
+/// Konvertiert Cent (Int64) zurück in Euro-String mit 2 Nachkommastellen
+function CentToEuro(const Cent: Int64): string;
+
+implementation
+
+
+
+
+
+/// Konvertiert einen String im Euro-Format (z. B. '12,34') in Cent als Int64
+function EuroStringToCent(const EuroText: string): Int64;
+var
+  Value: Double;
+begin
+  // Leeren oder ungültigen String als 0 behandeln
+  if not TryStrToFloat(Trim(EuroText), Value) then
+    Value := 0;
+
+  Result := Round(Value * 100);
+end;
+
+
+
+
+/// Liest den Text aus einem TLabeledEdit und konvertiert ihn in Cent
+function EditTextToCent(const Edit: TLabeledEdit): Int64;
+begin
+  if Edit = nil then
+    Exit(0);
+
+  // Einfach den Text an die zentrale Funktion weitergeben
+  Result := EuroStringToCent(Edit.Text);
+end;
+
+
+
+
+
+/// Konvertiert Cent (Int64) zurück in Euro-String mit 2 Nachkommastellen
+function CentToEuro(const Cent: Int64): string;
+begin
+  Result := FormatFloat('0.00', Cent / 100);
+end;
+
+end.
+

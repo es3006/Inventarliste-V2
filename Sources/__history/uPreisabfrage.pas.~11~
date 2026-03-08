@@ -1,0 +1,676 @@
+﻿unit uPreisabfrage;
+
+interface
+
+uses
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
+  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.ExtCtrls,
+  FireDAC.Stan.Param, FireDAC.Phys.SQLite, Data.DB, FireDAC.Comp.DataSet,
+  FireDAC.Comp.Client, System.Generics.Defaults,
+  FireDAC.Stan.Intf, FireDAC.DApt, Vcl.ComCtrls, Vcl.Mask;
+
+
+type
+  TfPreisabfrage = class(TForm)
+    pnlHint: TPanel;
+    Label4: TLabel;
+    Panel3: TPanel;
+    pnlEinheit: TPanel;
+    Label1: TLabel;
+    cbEinheit1: TComboBox;
+    cbEinheit2: TComboBox;
+    cbEinheit3: TComboBox;
+    cbEinheit4: TComboBox;
+    cbEinheit5: TComboBox;
+    cbEinheit6: TComboBox;
+    cbEinheit7: TComboBox;
+    cbEinheit8: TComboBox;
+    cbEinheit9: TComboBox;
+    cbEinheit10: TComboBox;
+    edEKPreis1: TEdit;
+    edEKPreis2: TEdit;
+    edEKPreis3: TEdit;
+    edEKPreis4: TEdit;
+    edEKPreis5: TEdit;
+    edEKPreis6: TEdit;
+    edEKPreis7: TEdit;
+    edEKPreis8: TEdit;
+    edEKPreis9: TEdit;
+    edEKPreis10: TEdit;
+    cbVerkauf: TCheckBox;
+    pnlVerkauf: TPanel;
+    Label3: TLabel;
+    edRechnungsNr: TLabeledEdit;
+    dtpVerkaufsdatum: TDateTimePicker;
+    edVerkaufBemerkung: TLabeledEdit;
+    Bevel1: TBevel;
+    pnlVerkaufspreis: TPanel;
+    edVerkaufspreis1: TEdit;
+    edVerkaufspreis2: TEdit;
+    edVerkaufspreis3: TEdit;
+    edVerkaufspreis4: TEdit;
+    edVerkaufspreis5: TEdit;
+    edVerkaufspreis6: TEdit;
+    edVerkaufspreis7: TEdit;
+    edVerkaufspreis8: TEdit;
+    edVerkaufspreis9: TEdit;
+    edVerkaufspreis10: TEdit;
+    Label6: TLabel;
+    lbEinkaufspreis: TLabel;
+    Label2: TLabel;
+    edBesteuernderBetrag1: TEdit;
+    edBesteuernderBetrag2: TEdit;
+    edBesteuernderBetrag3: TEdit;
+    edBesteuernderBetrag4: TEdit;
+    edBesteuernderBetrag5: TEdit;
+    edBesteuernderBetrag6: TEdit;
+    edBesteuernderBetrag7: TEdit;
+    edBesteuernderBetrag8: TEdit;
+    edBesteuernderBetrag10: TEdit;
+    edBesteuernderBetrag9: TEdit;
+    btnVerkaufen: TButton;
+    procedure FormShow(Sender: TObject);
+    procedure cbEinheit1Select(Sender: TObject);
+    procedure edEKPreis1Change(Sender: TObject);
+    procedure cbVerkaufClick(Sender: TObject);
+    procedure edVerkaufspreis1Exit(Sender: TObject);
+    procedure edVerkaufspreis1KeyPress(Sender: TObject; var Key: Char);
+    procedure btnVerkaufenClick(Sender: TObject);
+  private
+    procedure SetControlsSmall;
+    procedure SetControlsWide;
+    procedure SetControlSizes(ComboWidth, EditWidth, EditLeft: Integer; ShowVerkauf: Boolean);
+    function LoadHighestPurchasePrice(const AConnection: TFDConnection; Einheit: String): string;
+    //function LoadHighestPurchasePriceRecord(const AConnection: TFDConnection; const Einheit: string): TEinheitPreis;
+    procedure LoadEinheitenFromInventar(const AConnection: TFDConnection; cb: TComboBox);
+  public
+    { Public-Deklarationen }
+  end;
+
+var
+  fPreisabfrage: TfPreisabfrage;
+
+
+
+
+implementation
+
+{$R *.dfm}
+
+uses
+  uMain, uFunctions, uDBFunctions, uMoneyHelper, uSQLiteDateHelper;
+
+
+
+
+
+
+
+
+
+
+procedure TfPreisabfrage.btnVerkaufenClick(Sender: TObject);
+var
+  i: Integer;
+  Combo: TComboBox;
+  edVK, edSteuer: TEdit;
+  ID: Integer;
+  Q: TFDQuery;
+  MissingVK: string;
+  AnySelected: Boolean;
+begin
+  // Rechnungsnr prüfen
+  if Trim(edRechnungsNr.Text) = '' then
+  begin
+    ShowMessage('Bitte geben Sie eine Rechnungsnr ein!');
+    edRechnungsNr.SetFocus;
+    Exit;
+  end;
+
+  // Verkaufsdatum prüfen
+  if not dtpVerkaufsdatum.Checked then
+  begin
+    ShowMessage('Bitte wählen Sie ein Verkaufsdatum aus!');
+    dtpVerkaufsdatum.SetFocus;
+    Exit;
+  end;
+
+  // ==== Prüfen, ob mindestens eine ComboBox ausgewählt wurde ====
+  AnySelected := False;
+  for i := 1 to 10 do
+  begin
+    Combo := FindComponent('cbEinheit' + IntToStr(i)) as TComboBox;
+    if Assigned(Combo) and (Combo.ItemIndex > 0) then
+    begin
+      AnySelected := True;
+      Break;
+    end;
+  end;
+
+  if not AnySelected then
+  begin
+    ShowMessage('Bitte wählen Sie mindestens eine Einheit aus!');
+    Exit;
+  end;
+
+  // ==== Prüfen, ob zu jeder gewählten Einheit ein Verkaufswert eingegeben wurde ====
+  MissingVK := '';
+  for i := 1 to 10 do
+  begin
+    Combo := FindComponent('cbEinheit' + IntToStr(i)) as TComboBox;
+    edVK  := FindComponent('edVerkaufspreis' + IntToStr(i)) as TEdit;
+
+    if Assigned(Combo) and (Combo.ItemIndex > 0) then
+    begin
+      if (edVK = nil) or (Trim(edVK.Text) = '') then
+      begin
+        if MissingVK <> '' then
+          MissingVK := MissingVK + sLineBreak;
+        MissingVK := MissingVK + Format('Einheit %d: "%s"', [i, Combo.Text]);
+      end;
+    end;
+  end;
+
+  if MissingVK <> '' then
+  begin
+    ShowMessage('Bitte geben Sie Verkaufswerte für folgende Einheiten ein:' + sLineBreak + MissingVK);
+
+    // Fokus auf das erste fehlende Feld setzen
+    for i := 1 to 10 do
+    begin
+      Combo := FindComponent('cbEinheit' + IntToStr(i)) as TComboBox;
+      edVK  := FindComponent('edVerkaufspreis' + IntToStr(i)) as TEdit;
+      if Assigned(Combo) and Assigned(edVK) and (Combo.ItemIndex > 0) and (Trim(edVK.Text) = '') then
+      begin
+        edVK.SetFocus;
+        Break;
+      end;
+    end;
+
+    Exit; // DB-Update abbrechen
+  end;
+
+  // ==== Alles geprüft, nun Datenbank aktualisieren ====
+  Q := TFDQuery.Create(nil);
+  try
+    Q.Connection := fMain.FDConnection1;
+
+    for i := 1 to 10 do
+    begin
+      Combo    := FindComponent('cbEinheit' + IntToStr(i)) as TComboBox;
+      edVK     := FindComponent('edVerkaufspreis' + IntToStr(i)) as TEdit;
+      edSteuer := FindComponent('edBesteuernderBetrag' + IntToStr(i)) as TEdit;
+
+      if Assigned(Combo) and (Combo.ItemIndex > 0) then
+      begin
+        ID := NativeInt(Combo.Items.Objects[Combo.ItemIndex]);
+
+        if ID > 0 then
+        begin
+          Q.SQL.Text :=
+            'UPDATE inventar SET ' +
+            'Verkaufsdatum = :vd, ' +
+            'Verkaufswert = :vw, ' +
+            'VerkaufBemerkung = :vb, ' +
+            'Steuerbetrag = :sb, ' +
+            'RechnungsNr = :rn ' +
+            'WHERE id = :id';
+
+          Q.ParamByName('vd').AsString   := DateTimeToSQLiteDate(dtpVerkaufsdatum.Date);
+          Q.ParamByName('vw').AsLargeInt := DecimalStringToInt100(edVK.Text);
+          Q.ParamByName('vb').AsString   := edVerkaufBemerkung.Text;
+          Q.ParamByName('sb').AsLargeInt := DecimalStringToInt100(edSteuer.Text);
+          Q.ParamByName('rn').AsString   := edRechnungsNr.Text;
+          Q.ParamByName('id').AsInteger  := ID;
+
+          Q.ExecSQL;
+        end;
+      end;
+    end;
+
+    ShowMessage('Datensätze erfolgreich aktualisiert.');
+  finally
+    Q.Free;
+    close;
+  end;
+end;
+
+
+
+
+procedure TfPreisabfrage.cbEinheit1Select(Sender: TObject);
+var
+  Combo: TComboBox;
+  Nummer: string;
+  Edit: TEdit;
+  ID: Integer;
+  Q: TFDQuery;
+begin
+  Combo := Sender as TComboBox;
+
+  // Nummer aus "cbEinheitX" ermitteln
+  Nummer := Copy(Combo.Name, Length('cbEinheit') + 1, MaxInt);
+
+  // Zugehöriges Edit suchen
+  Edit := FindComponent('edEKPreis' + Nummer) as TEdit;
+
+  if not Assigned(Edit) then
+    Exit;
+
+  // Leeres Item gewählt
+  if Combo.ItemIndex <= 0 then
+  begin
+    Edit.Clear;
+    Exit;
+  end;
+
+  // ID direkt aus der ComboBox holen
+  ID := NativeInt(Combo.Items.Objects[Combo.ItemIndex]);
+
+  if ID <= 0 then
+  begin
+    Edit.Clear;
+    Exit;
+  end;
+
+  // Einkaufswert über ID laden
+  Q := TFDQuery.Create(nil);
+  try
+    Q.Connection := fMain.FDConnection1;
+    Q.SQL.Text := 'SELECT Einkaufswert FROM inventar WHERE id = :id';
+    Q.ParamByName('id').AsInteger := ID;
+    Q.Open;
+
+    if not Q.IsEmpty then
+      Edit.Text := Int100ToDecimalString(Q.FieldByName('Einkaufswert').AsLargeInt)
+    else
+      Edit.Clear;
+
+  finally
+    Q.Free;
+  end;
+end;
+
+
+
+procedure TfPreisabfrage.cbVerkaufClick(Sender: TObject);
+begin
+  pnlVerkauf.Visible := cbVerkauf.Checked;
+
+  if(pnlVerkauf.Visible = true) then
+  begin
+    SetControlsSmall;
+  end
+  else
+  begin
+    SetControlsWide;
+  end;
+end;
+
+
+
+
+
+procedure TfPreisabfrage.edEKPreis1Change(Sender: TObject);
+begin
+  if(TEdit(Sender).Text = 'Nicht vorhanden') then
+  begin
+    TEdit(Sender).Color := clBtnFace;
+    TEdit(Sender).Font.Color := clRed;
+  end
+  else
+  begin
+    TEdit(Sender).Color := clWindow;
+    TEdit(Sender).Font.Color := clBlack;
+  end;
+end;
+
+
+
+procedure TfPreisabfrage.edVerkaufspreis1Exit(Sender: TObject);
+var
+  Edit: TEdit;
+  Nummer: string;
+  EinkaufsEdit, DiffEdit: TEdit;
+  VerkaufsCent, EinkaufsCent, DiffCent: Int64;
+begin
+  if not (Sender is TEdit) then Exit;
+  Edit := TEdit(Sender);
+
+  if Trim(Edit.Text) = '' then Exit;
+
+  // ===== Validierung =====
+  if not IsValidDecimalString(Edit.Text) then
+  begin
+    ShowMessage('Bitte geben Sie einen gültigen Wert ein.');
+    Edit.SetFocus;
+    Edit.SelectAll;
+    Exit;
+  end;
+
+  // ===== Formatierung =====
+  Edit.Text := Int100ToDecimalString(DecimalStringToInt100(Edit.Text));
+
+  // ===== Nummer der Zeile ermitteln =====
+  Nummer := Copy(Edit.Name, Length('edVerkaufspreis') + 1, MaxInt);
+
+  // ===== Einkaufswert-Edit ermitteln =====
+  EinkaufsEdit := FindEditByName(Self, 'edEKPreis' + Nummer);
+  if not Assigned(EinkaufsEdit) then Exit;
+  if (Trim(EinkaufsEdit.Text) = '') or (Trim(EinkaufsEdit.Text).ToLower = 'nicht vorhanden') then Exit;
+
+  // ===== Diff-Edit ermitteln =====
+  DiffEdit := FindEditByName(Self, 'edBesteuernderBetrag' + Nummer);
+  if not Assigned(DiffEdit) then Exit;
+
+  // ===== Berechnung =====
+  VerkaufsCent := DecimalStringToInt100(Edit.Text);
+  EinkaufsCent := DecimalStringToInt100(EinkaufsEdit.Text);
+  DiffCent := VerkaufsCent - EinkaufsCent;
+
+  // ===== Ergebnis ins zugehörige Feld =====
+  DiffEdit.Text := Int100ToDecimalString(DiffCent);
+end;
+
+
+
+
+procedure TfPreisabfrage.edVerkaufspreis1KeyPress(Sender: TObject; var Key: Char);
+begin
+// Ziffern erlauben
+  if CharInSet(Key, ['0'..'9']) then
+    Exit;
+
+  // Komma erlauben (nur einmal)
+  if (Key = ',') and (Pos(',', (Sender as TEdit).Text) = 0) then
+    Exit;
+
+  // Backspace erlauben
+  if Key = #8 then
+    Exit;
+
+  // Enter erlauben
+  if Key = #13 then
+    Exit;
+
+  if Key = '.' then
+  begin
+    Key := ',';
+    if Pos(',', (Sender as TEdit).Text) > 0 then
+      Key := #0;
+    Exit;
+  end;
+
+  if (Key = '-') and ((Sender as TEdit).SelStart = 0)
+   and (Pos('-', (Sender as TEdit).Text) = 0) then
+  Exit;
+
+  // Alles andere blockieren
+  Key := #0;
+end;
+
+
+
+
+
+
+
+
+
+
+
+{
+procedure TfPreisabfrage.LoadEinheitenFromInventar(const AConnection: TFDConnection; cb: TComboBox);
+var
+  Q: TFDQuery;
+begin
+  cb.Items.Clear;
+
+  cb.Items.Add('');
+
+  Q := TFDQuery.Create(nil);
+  try
+    Q.Connection := AConnection;
+
+    // ===== SQL =====
+    // Nur nicht verkaufte Artikel (Verkaufsdatum IS NULL, Verkaufswert NULL oder 0)
+    // Jede Einheit nur einmal, mit höchstem Einkaufswert
+    Q.SQL.Text :=
+      'SELECT einheit, MAX(Einkaufswert) AS MaxEK ' +
+      'FROM inventar ' +
+      'WHERE Verkaufsdatum IS NULL ' +
+      'AND (Verkaufswert IS NULL OR Verkaufswert = 0) ' +
+      'AND einheit <> '''' ' +
+      'GROUP BY einheit ' +
+      'ORDER BY MAX(Einkaufswert) DESC';
+
+
+    Q.Open;
+
+    while not Q.Eof do
+    begin
+      cb.Items.Add(Q.FieldByName('einheit').AsString);
+      Q.Next;
+    end;
+
+  finally
+    Q.Free;
+  end;
+end;
+}
+
+
+
+
+procedure TfPreisabfrage.LoadEinheitenFromInventar(const AConnection: TFDConnection; cb: TComboBox);
+var
+  Q: TFDQuery;
+begin
+  cb.Items.Clear;
+
+  // Leerer Eintrag (ID = 0)
+  cb.Items.AddObject('', TObject(NativeInt(0)));
+
+  Q := TFDQuery.Create(nil);
+  try
+    Q.Connection := AConnection;
+
+    Q.SQL.Text :=
+      'SELECT id, einheit FROM ( ' +
+      '  SELECT id, einheit, ' +
+      '         ROW_NUMBER() OVER ( ' +
+      '           PARTITION BY einheit ' +
+      '           ORDER BY Einkaufswert DESC, id DESC ' +
+      '         ) AS rn ' +
+      '  FROM inventar ' +
+      '  WHERE Verkaufsdatum IS NULL ' +
+      '    AND (Verkaufswert IS NULL OR Verkaufswert = 0) ' +
+      '    AND einheit <> '''' ' +
+      ') ' +
+      'WHERE rn = 1 ' +
+      'ORDER BY einheit';
+
+    Q.Open;
+
+    while not Q.Eof do
+    begin
+      cb.Items.AddObject(
+        Q.FieldByName('einheit').AsString,
+        TObject(NativeInt(Q.FieldByName('id').AsInteger))
+      );
+      Q.Next;
+    end;
+
+  finally
+    Q.Free;
+  end;
+end;
+
+
+
+
+
+procedure TfPreisabfrage.SetControlsWide;
+begin
+  // nur Layout-Parameter, keine FormSize mehr – Berechnung erfolgt in
+  // SetControlSizes
+  SetControlSizes(
+    145,  // ComboWidth
+    156,  // EditWidth
+    180,  // EditLeft
+    False
+  );
+end;
+
+procedure TfPreisabfrage.SetControlsSmall;
+begin
+  SetControlSizes(
+    100,  // ComboWidth
+    100,  // EditWidth
+    130,  // EditLeft
+    True
+  );
+end;
+
+procedure TfPreisabfrage.SetControlSizes(ComboWidth, EditWidth, EditLeft: Integer;
+  ShowVerkauf: Boolean);
+var
+  i: Integer;
+  NewFormWidth, NewUnitPanelWidth: Integer;
+begin
+  // Design‑Pixel in den Parametern, also skalieren wir einmal hier.
+  ComboWidth := ScaleByDPI(ComboWidth);
+  EditWidth  := ScaleByDPI(EditWidth);
+  EditLeft   := ScaleByDPI(EditLeft);
+
+  // Breiten der Spalten setzen
+  for i := 1 to 10 do
+  begin
+    TComboBox(FindComponent('cbEinheit' + IntToStr(i))).Width := ComboWidth;
+    TEdit(FindComponent('edEKPreis' + IntToStr(i))).Width     := EditWidth;
+    TEdit(FindComponent('edEKPreis' + IntToStr(i))).Left      := EditLeft;
+  end;
+
+  // Position des Kopflabels anpassen
+  lbEinkaufspreis.Left     := EditLeft;
+
+  // interner Verkaufspreis-Bereich
+  pnlVerkaufspreis.Visible := ShowVerkauf;
+
+  // Breite des Einheitenpanels je nach sichtbarer Spaltenzahl
+  if ShowVerkauf then
+    // Designbreite inklusive rechter Spalte (100+100+<Abstände>)
+    NewUnitPanelWidth := ScaleByDPI(460)
+  else
+    // nur linke Spalte: Combo + EK‑Edit + etwas Luft
+    NewUnitPanelWidth := ComboWidth + EditWidth + ScaleByDPI(30);
+
+  pnlEinheit.Width := NewUnitPanelWidth;
+
+  // Gesamte Formbreite berechnen, berücksichtigt auch externes Verkaufs-panel
+  NewFormWidth := pnlEinheit.Width;
+  if pnlVerkauf.Visible then
+    NewFormWidth := NewFormWidth + ScaleByDPI(pnlVerkauf.Width);
+
+  // kleine Puffer nach rechts, damit nichts am Rand klebt
+  Inc(NewFormWidth, ScaleByDPI(20));
+
+  fPreisabfrage.Width := NewFormWidth;
+end;
+
+
+
+
+
+
+
+procedure TfPreisabfrage.FormShow(Sender: TObject);
+var
+  i: Integer;
+  ComboArray: array[2..10] of TComboBox;
+begin
+  ClearEdits(pnlEinheit);
+  ClearLabeledEdits(pnlVerkauf);
+  cbVerkauf.Checked := false;
+  dtpVerkaufsdatum.Date := now;
+  dtpVerkaufsdatum.Checked := false;
+
+  SetControlsWide;
+
+  LoadEinheitenFromInventar(fMain.FDConnection1, cbEinheit1);
+
+  ComboArray[2] := cbEinheit2;
+  ComboArray[3] := cbEinheit3;
+  ComboArray[4] := cbEinheit4;
+  ComboArray[5] := cbEinheit5;
+  ComboArray[6] := cbEinheit6;
+  ComboArray[7] := cbEinheit7;
+  ComboArray[8] := cbEinheit8;
+  ComboArray[9] := cbEinheit9;
+  ComboArray[10] := cbEinheit10;
+
+  for i := 2 to 10 do
+    ComboArray[i].Items.Assign(cbEinheit1.Items);
+end;
+
+
+function TfPreisabfrage.LoadHighestPurchasePrice(const AConnection: TFDConnection; Einheit: String): string;
+var
+  Q: TFDQuery;
+  MaxEK: Int64;
+begin
+  Q := TFDQuery.Create(nil);
+  try
+    Q.Connection := AConnection;
+
+    // 1️Höchsten Einkaufswert ermitteln
+    Q.SQL.Text :=
+      'SELECT MAX(Einkaufswert) AS MaxEK ' +
+      'FROM inventar ' +
+      'WHERE Verkaufsdatum IS NULL ' +
+      'AND (Verkaufswert = 0 OR Verkaufswert IS NULL) ' +
+      'AND Einheit = :EINHEIT';
+
+    Q.ParamByName('EINHEIT').AsString := Einheit;
+    Q.Open;
+
+    if Q.IsEmpty or Q.FieldByName('MaxEK').IsNull then
+      Exit('Nicht vorhanden');
+
+    MaxEK := Q.FieldByName('MaxEK').AsLargeInt;
+    Q.Close;
+
+    // 2️ID des Datensatzes mit diesem höchsten EK auslesen
+    Q.SQL.Text :=
+      'SELECT id, Einkaufswert ' +
+      'FROM inventar ' +
+      'WHERE Verkaufsdatum IS NULL ' +
+      'AND (Verkaufswert = 0 OR Verkaufswert IS NULL) ' +
+      'AND Einheit = :EINHEIT ' +
+      'AND Einkaufswert = :MaxEK ' +
+      'ROWS 1';
+
+    Q.ParamByName('EINHEIT').AsString := Einheit;
+    Q.ParamByName('MaxEK').AsLargeInt := MaxEK;
+    Q.Open;
+
+    if not Q.IsEmpty then
+      Result := 'ID: ' + Q.FieldByName('id').AsString +
+                ' | EK: ' + Int100ToDecimalString(Q.FieldByName('Einkaufswert').AsLargeInt)
+    else
+      Result := 'Nicht gefunden';
+
+  finally
+    Q.Free;
+  end;
+end;
+
+
+
+
+
+
+
+
+
+end.

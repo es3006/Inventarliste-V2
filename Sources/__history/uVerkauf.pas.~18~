@@ -1,0 +1,443 @@
+﻿unit uVerkauf;
+
+interface
+
+uses
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
+  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.Mask, Vcl.ExtCtrls,
+  Vcl.Imaging.pngimage, Vcl.ComCtrls, DateUtils,
+  FireDAC.Stan.Param, FireDAC.Phys.SQLite, Data.DB, FireDAC.Comp.DataSet,
+  FireDAC.Comp.Client, FireDAC.Stan.Intf, FireDAC.DApt, AdvPageControl;
+
+type
+  TfVerkauf = class(TForm)
+    edRechnungsNr: TLabeledEdit;
+    dtpVerkaufsdatum: TDateTimePicker;
+    Label2: TLabel;
+    edVerkaufswert: TLabeledEdit;
+    edBesteuernderBetrag: TLabeledEdit;
+    edVerkaufBemerkung: TLabeledEdit;
+    btnSave: TButton;
+    btnAbort: TButton;
+    edSKU: TLabeledEdit;
+    edEinkaufswert: TLabeledEdit;
+    Label1: TLabel;
+    Label3: TLabel;
+    Panel1: TPanel;
+    Label5: TLabel;
+    imgTaschenrechner: TImage;
+    btnDeleteVerkauf: TButton;
+    procedure btnAbortClick(Sender: TObject);
+    procedure btnSaveClick(Sender: TObject);
+    procedure FormShow(Sender: TObject);
+    procedure edVerkaufswertKeyPress(Sender: TObject; var Key: Char);
+    procedure edVerkaufswertExit(Sender: TObject);
+    procedure imgTaschenrechnerClick(Sender: TObject);
+    procedure FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
+    procedure btnDeleteVerkaufClick(Sender: TObject);
+    procedure FormActivate(Sender: TObject);
+  private
+    procedure LoadData;
+    procedure UpdateVerkaufInDB(const AID: Integer; const ADelete: Boolean);
+
+  public
+    { Public-Deklarationen }
+  end;
+
+var
+  fVerkauf: TfVerkauf;
+  ENTRYID: integer;
+  EINKAUFSWERT: string;
+
+
+
+implementation
+
+{$R *.dfm}
+
+uses
+  uMain, uFunctions, uDBFunctions, uMoneyHelper, uSQLiteDateHelper;
+
+
+
+
+procedure TfVerkauf.btnAbortClick(Sender: TObject);
+begin
+  close;
+end;
+
+
+
+
+
+procedure TfVerkauf.btnDeleteVerkaufClick(Sender: TObject);
+var
+  i, ID: integer;
+begin
+  i := fMain.lvInventar.ItemIndex;
+  if(i <> -1) then
+  begin
+    if MessageDlg('Wollen Sie den Status für den Artikel wirklich auf ' + sLineBreak +
+       '"Noch nicht verkauft" aktualisieren?',
+       mtConfirmation, [mbYes, mbNo], 0) = mrYes then
+    begin
+      ID := StrToInt(fMain.lvInventar.Items[i].Caption);
+
+      UpdateVerkaufInDB(ID, True);
+
+      fMain.AktualisiereAndShowStatistik;
+    end
+    else
+      exit;
+  end;
+end;
+
+
+
+
+procedure TfVerkauf.UpdateVerkaufInDB(const AID: Integer; const ADelete: Boolean);
+var
+  i: Integer;
+  FDQuery: TFDQuery;
+  verkaufswertCent: Int64;
+  steuerbetragCent: Int64;
+  rechnungsNr, verkaufBemerkung: string;
+begin
+  i := fMain.lvInventar.ItemIndex;
+  if (AID <= 0) or (i = -1) then
+  begin
+    ShowMessage('Es wurde kein Eintrag ausgewählt');
+    Exit;
+  end;
+
+  FDQuery := TFDQuery.Create(nil);
+  try
+    FDQuery.Connection := fMain.FDConnection1;
+
+    FDQuery.SQL.Text :=
+      'UPDATE inventar SET ' +
+      'Verkaufsdatum = :VERKAUFSDATUM, ' +
+      'Verkaufswert = :VERKAUFSWERT, ' +
+      'VerkaufBemerkung = :VERKAUFBEMERKUNG, ' +
+      'Steuerbetrag = :STEUERBETRAG, ' +
+      'RechnungsNr = :RECHNUNGSNR ' +
+      'WHERE id = :ID';
+
+    fMain.FDConnection1.StartTransaction;
+    try
+      FDQuery.ParamByName('ID').AsInteger := AID;
+
+      if ADelete then
+      begin
+        // Alles zurücksetzen
+        FDQuery.ParamByName('VERKAUFSDATUM').Clear;
+        FDQuery.ParamByName('VERKAUFSWERT').AsLargeInt   := 0;
+        FDQuery.ParamByName('VERKAUFBEMERKUNG').AsString := '';
+        FDQuery.ParamByName('STEUERBETRAG').AsLargeInt   := 0;
+        FDQuery.ParamByName('RECHNUNGSNR').AsString      := '';
+      end
+      else
+      begin
+        // Werte aus UI holen
+        verkaufswertCent := DecimalStringToInt100(edVerkaufswert.Text);
+        steuerbetragCent := DecimalStringToInt100(edBesteuernderBetrag.Text);
+        rechnungsNr      := Trim(edRechnungsNr.Text);
+        verkaufBemerkung := Trim(edVerkaufBemerkung.Text);
+
+        SetSQLiteDateParam(
+          FDQuery.ParamByName('VERKAUFSDATUM'),
+          dtpVerkaufsdatum
+        );
+
+        FDQuery.ParamByName('VERKAUFSWERT').AsLargeInt   := verkaufswertCent;
+        FDQuery.ParamByName('VERKAUFBEMERKUNG').AsString := verkaufBemerkung;
+        FDQuery.ParamByName('STEUERBETRAG').AsLargeInt   := steuerbetragCent;
+        FDQuery.ParamByName('RECHNUNGSNR').AsString      := rechnungsNr;
+      end;
+
+      FDQuery.ExecSQL;
+      fMain.FDConnection1.Commit;
+    except
+      fMain.FDConnection1.Rollback;
+      raise;
+    end;
+
+  finally
+    FDQuery.Free;
+  end;
+
+  // ListView aktualisieren
+  with fMain.lvInventar.Items[i] do
+  begin
+    if ADelete then
+    begin
+      SubItems[5] := '';
+      SubItems[6] := '';
+      SubItems[7] := '';
+      SubItems[8] := '';
+      SubItems[9] := '';
+    end
+    else
+    begin
+      SubItems[5] := SQLiteDateToDisplay(DateTimeToSQLiteDate(dtpVerkaufsdatum.Date));
+      SubItems[6] := Int100ToDecimalString(DecimalStringToInt100(edVerkaufswert.Text));
+      SubItems[7] := Trim(edVerkaufBemerkung.Text);
+      SubItems[8] := Int100ToDecimalString(DecimalStringToInt100(edBesteuernderBetrag.Text));
+      SubItems[9] := Trim(edRechnungsNr.Text);
+    end;
+  end;
+
+  uMain.ListViewDirty := True;
+  fMain.AktualisiereAndShowStatistik;
+end;
+
+
+
+
+
+
+
+procedure TfVerkauf.btnSaveClick(Sender: TObject);
+var
+  i: Integer;
+  FDQuery: TFDQuery;
+begin
+  i := fMain.lvInventar.ItemIndex;
+  if i = -1 then
+  begin
+    ShowMessage('Es wurde kein Eintrag ausgewählt');
+    Exit;
+  end;
+
+  // ===== Validierung Rechnungsnummer =====
+  if Trim(edRechnungsNr.Text) = '' then
+  begin
+    ShowMessage('Bitte geben Sie eine Rechnungsnummer ein!');
+    edRechnungsNr.SetFocus;
+    Exit;
+  end;
+
+  // ===== Validierung Verkaufsdatum =====
+  if not dtpVerkaufsdatum.Checked then
+  begin
+    ShowMessage('Bitte wählen Sie das Verkaufsdatum aus!');
+    dtpVerkaufsdatum.SetFocus;
+    Exit;
+  end;
+
+  // ===== Validierung Verkaufswert =====
+  if not IsValidDecimalString(edVerkaufswert.Text) then
+  begin
+    ShowMessage('Ungültiger Verkaufswert! Bitte verwenden Sie das Format: 123,45');
+    edVerkaufswert.SetFocus;
+    Exit;
+  end;
+
+  UpdateVerkaufInDB(ENTRYID, False);
+
+  Close;
+end;
+
+
+
+
+
+
+
+
+procedure TfVerkauf.edVerkaufswertExit(Sender: TObject);
+var
+  Edit: TLabeledEdit;
+  VerkaufsCent, EinkaufsCent, DiffCent: Int64;
+begin
+  if not (Sender is TLabeledEdit) then
+    Exit;
+
+  Edit := TLabeledEdit(Sender);
+
+  if Trim(Edit.Text) = '' then
+    Exit;
+
+  // ===== Validierung mit Helper-Funktion =====
+  if not IsValidDecimalString(Edit.Text) then
+  begin
+    ShowMessage('Bitte geben Sie einen gültigen Wert ein.');
+    Edit.SetFocus;
+    Edit.SelectAll;
+    Exit;
+  end;
+
+  // ===== Formatierung mit Helper-Funktion =====
+  // Konvertiere zu Int64 und zurück zu String für einheitliche Formatierung
+  Edit.Text := Int100ToDecimalString(DecimalStringToInt100(Edit.Text));
+
+  // ===== Berechnung des besteuernden Betrags =====
+  if Trim(edVerkaufswert.Text) = '' then Exit;
+  if Trim(edEinkaufswert.Text) = '' then Exit;
+
+  VerkaufsCent := DecimalStringToInt100(edVerkaufswert.Text);
+  EinkaufsCent := DecimalStringToInt100(edEinkaufswert.Text);
+
+  // IMMER rechnen – negatives Ergebnis ist erlaubt
+  DiffCent := VerkaufsCent - EinkaufsCent;
+
+  edBesteuernderBetrag.Text := Int100ToDecimalString(DiffCent);
+end;
+
+
+
+
+
+
+procedure TfVerkauf.edVerkaufswertKeyPress(Sender: TObject; var Key: Char);
+begin
+// Ziffern erlauben
+  if CharInSet(Key, ['0'..'9']) then
+    Exit;
+
+  // Komma erlauben (nur einmal)
+  if (Key = ',') and (Pos(',', (Sender as TLabeledEdit).Text) = 0) then
+    Exit;
+
+  // Backspace erlauben
+  if Key = #8 then
+    Exit;
+
+  // Enter erlauben
+  if Key = #13 then
+    Exit;
+
+  if Key = '.' then
+  begin
+    Key := ',';
+    if Pos(',', (Sender as TLabeledEdit).Text) > 0 then
+      Key := #0;
+    Exit;
+  end;
+
+  if (Key = '-') and ((Sender as TLabeledEdit).SelStart = 0)
+   and (Pos('-', (Sender as TLabeledEdit).Text) = 0) then
+  Exit;
+
+  // Alles andere blockieren
+  Key := #0;
+end;
+
+
+
+
+procedure TfVerkauf.FormActivate(Sender: TObject);
+begin
+ btnAbort.SetFocus;
+end;
+
+
+
+
+procedure TfVerkauf.FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
+begin
+  if Key = VK_ESCAPE then
+  begin
+    btnAbort.SetFocus;
+    Key := 0;
+    Close;
+  end;
+end;
+
+
+
+
+procedure TfVerkauf.FormShow(Sender: TObject);
+begin
+  edSKU.Clear;
+  edRechnungsNr.Clear;
+  edVerkaufBemerkung.Clear;
+  dtpVerkaufsdatum.Checked := false;
+  edVerkaufswert.Clear;
+  edBesteuernderBetrag.Clear;
+
+  if(ENTRYID <= 0) then
+  begin
+    showmessage('Es wurde keine ID übergeben');
+    exit;
+  end;
+
+  LoadData;
+
+  if(dtpVerkaufsdatum.Checked = false) then
+  begin
+    Caption := 'Warenverkauf';
+    Label5.Caption := 'Warenverkauf';
+    btnDeleteverkauf.Visible := false
+  end
+  else
+  begin
+    Caption := 'Warenverkauf bearbeiten';
+    Label5.Caption := 'Warenverkauf bearbeiten';
+    btnDeleteverkauf.Visible := true;
+  end;
+end;
+
+
+
+
+procedure TfVerkauf.imgTaschenrechnerClick(Sender: TObject);
+begin
+  OpenCalculator
+end;
+
+
+
+
+procedure TfVerkauf.LoadData;
+var
+  Q: TFDQuery;
+  verkaufswert, steuerbetrag: Int64;
+begin
+  Q := TFDQuery.Create(nil);
+  try
+    Q.Connection := fMain.FDConnection1;
+    Q.SQL.Text :=
+      'SELECT id, Einkaufsdatum, SKU, Einkaufswert, EinkaufBemerkung, ' +
+      'Verkaufsdatum, Verkaufswert, VerkaufBemerkung, ' +
+      'Steuerbetrag, RechnungsNr, Einheit ' +
+      'FROM inventar WHERE id = :ID';
+    Q.ParamByName('ID').AsInteger := ENTRYID;
+    Q.Open;
+
+    if not Q.IsEmpty then
+    begin
+      // SKU und Einkaufsdaten
+      edSKU.Text := Q.FieldByName('SKU').AsString;
+      edEinkaufswert.Text := Int100ToDecimalString(Q.FieldByName('Einkaufswert').AsLargeInt);
+      edRechnungsNr.Text := Q.FieldByName('RechnungsNr').AsString;
+      edVerkaufbemerkung.Text := Q.FieldByName('VerkaufBemerkung').AsString;
+
+      // Datum
+      LoadSQLiteDateToDTP(Q.FieldByName('Verkaufsdatum').AsString, dtpVerkaufsdatum);
+
+      // Verkaufswert und Steuerbetrag
+      verkaufswert := Q.FieldByName('Verkaufswert').AsLargeInt;
+      steuerbetrag := Q.FieldByName('Steuerbetrag').AsLargeInt;
+
+      if (verkaufswert = 0) and (steuerbetrag <> 0) then
+        edVerkaufswert.Text := '0,00'
+      else
+        edVerkaufswert.Text := Int100ToDecimalString(verkaufswert);
+
+      edBesteuernderBetrag.Text := Int100ToDecimalString(steuerbetrag);
+    end;
+  finally
+    Q.Free;
+  end;
+end;
+
+
+
+
+
+
+
+
+
+end.

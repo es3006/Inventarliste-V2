@@ -1,0 +1,67 @@
+unit uLizenzDialog;
+
+interface
+
+uses
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
+  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.Mask, Vcl.ExtCtrls;
+
+type
+  TfLizenzDialog = class(TForm)
+    edEmail: TLabeledEdit;
+    edLizenzcode: TLabeledEdit;
+    lblStatus: TLabel;
+    btnAbbrechen: TButton;
+    btnOK: TButton;
+    Label1: TLabel;
+    procedure btnAbbrechenClick(Sender: TObject);
+    procedure btnOKClick(Sender: TObject);
+    procedure FormShow(Sender: TObject);
+  private
+    FEmail: string;
+    FLizenzcode: string;
+  public
+    property Email: string read FEmail;
+    property Lizenzcode: string read FLizenzcode;
+  end;
+
+var
+  fLizenzDialog: TfLizenzDialog;
+
+implementation
+
+{$R *.dfm}
+
+procedure TfLizenzDialog.btnAbbrechenClick(Sender: TObject);
+begin
+  ModalResult := mrCancel;
+end;
+
+procedure TfLizenzDialog.btnOKClick(Sender: TObject);
+begin
+  lblStatus.Caption := '';
+
+  if Trim(edEmail.Text) = '' then
+  begin
+    lblStatus.Caption := 'Bitte E-Mail-Adresse eingeben.';
+    Exit;
+  end;
+
+  if Trim(edLizenzcode.Text) = '' then
+  begin
+    lblStatus.Caption := 'Bitte Lizenzcode eingeben.';
+    Exit;
+  end;
+
+  FEmail := Trim(edEmail.Text);
+  FLizenzcode := Trim(edLizenzcode.Text);
+
+  ModalResult := mrOk; // Form schlieﬂen
+end;
+
+procedure TfLizenzDialog.FormShow(Sender: TObject);
+begin
+  lblStatus.Caption := '';
+end;
+
+end.

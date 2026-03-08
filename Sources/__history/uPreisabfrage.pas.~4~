@@ -1,0 +1,155 @@
+unit uPreisabfrage;
+
+interface
+
+uses
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
+  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.ExtCtrls,
+  FireDAC.Stan.Param, FireDAC.Phys.SQLite, Data.DB, FireDAC.Comp.DataSet,
+  FireDAC.Comp.Client, System.Generics.Defaults,
+  FireDAC.Stan.Intf, FireDAC.DApt;
+
+type
+  TfPreisabfrage = class(TForm)
+    Label1: TLabel;
+    cbEinheit1: TComboBox;
+    cbEinheit2: TComboBox;
+    cbEinheit3: TComboBox;
+    cbEinheit4: TComboBox;
+    cbEinheit5: TComboBox;
+    cbEinheit6: TComboBox;
+    cbEinheit7: TComboBox;
+    cbEinheit8: TComboBox;
+    cbEinheit9: TComboBox;
+    cbEinheit10: TComboBox;
+    pnlHint: TPanel;
+    Label4: TLabel;
+    edEKPreis1: TEdit;
+    Label2: TLabel;
+    edEKPreis2: TEdit;
+    edEKPreis3: TEdit;
+    edEKPreis4: TEdit;
+    edEKPreis5: TEdit;
+    edEKPreis6: TEdit;
+    edEKPreis7: TEdit;
+    edEKPreis8: TEdit;
+    edEKPreis9: TEdit;
+    edEKPreis10: TEdit;
+    procedure FormShow(Sender: TObject);
+    procedure cbEinheit1Select(Sender: TObject);
+    procedure edEKPreis1Change(Sender: TObject);
+  private
+    function LoadHighestPurchasePrice(const AConnection: TFDConnection; Einheit: String): string;
+  public
+    { Public-Deklarationen }
+  end;
+
+var
+  fPreisabfrage: TfPreisabfrage;
+
+implementation
+
+{$R *.dfm}
+
+uses
+  uMain, uDBFunctions, uMoneyHelper;
+
+
+
+procedure TfPreisabfrage.cbEinheit1Select(Sender: TObject);
+var
+  Combo: TComboBox;
+  Nummer: string;
+  Edit: TEdit;
+begin
+  Combo := Sender as TComboBox;
+
+  // Nummer aus dem Namen extrahieren (z.B. "1" aus "cbEinheit1")
+  Nummer := Copy(Combo.Name, Length('cbEinheit') + 1, MaxInt);
+
+  // Passendes Edit-Feld suchen
+  Edit := FindComponent('edEKPreis' + Nummer) as TEdit;
+
+  if Assigned(Edit) then
+  begin
+    Edit.Text := LoadHighestPurchasePrice(fMain.FDConnection1,Combo.Text);
+  end;
+end;
+
+
+
+procedure TfPreisabfrage.edEKPreis1Change(Sender: TObject);
+begin
+  if(edEKPreis1.Text = 'Nicht vorhanden') then
+  begin
+    edEKPreis1.Color := clBtnFace;
+  end
+  else
+  begin
+    edEKPreis1.Color := clWindow;
+  end;
+end;
+
+
+
+procedure TfPreisabfrage.FormShow(Sender: TObject);
+var
+  i: Integer;
+  ComboArray: array[2..10] of TComboBox;
+begin
+  LoadEinheitenFromDB(fMain.FDConnection1, cbEinheit1);
+
+  ComboArray[2] := cbEinheit2;
+  ComboArray[3] := cbEinheit3;
+  ComboArray[4] := cbEinheit4;
+  ComboArray[5] := cbEinheit5;
+  ComboArray[6] := cbEinheit6;
+  ComboArray[7] := cbEinheit7;
+  ComboArray[8] := cbEinheit8;
+  ComboArray[9] := cbEinheit9;
+  ComboArray[10] := cbEinheit10;
+
+  for i := 2 to 10 do
+    ComboArray[i].Items.Assign(cbEinheit1.Items);
+end;
+
+
+function TfPreisabfrage.LoadHighestPurchasePrice(const AConnection: TFDConnection; Einheit: String): string;
+var
+  Q: TFDQuery;
+begin
+  Q := TFDQuery.Create(nil);
+  try
+    Q.Connection := AConnection;
+    Q.SQL.Text := 'SELECT MAX(Einkaufswert) AS MaxEinkaufswert ' +
+                  'FROM inventar ' +
+                  'WHERE Verkaufsdatum IS NULL ' +
+                  'AND (Verkaufswert = 0 OR Verkaufswert IS NULL) ' +
+                  'AND Einheit = :EINHEIT';
+
+    Q.ParamByName('EINHEIT').AsString   := Einheit;
+
+    // Abfrage öffnen
+    Q.Open;
+
+    if not Q.IsEmpty then
+    begin
+      if(Q.FieldByName('MaxEinkaufswert').AsString <> '') then
+        //result := Q.FieldByName('MaxEinkaufswert').AsLargeInt
+
+        result := Int100ToDecimalString(Q.FieldByName('MaxEinkaufswert').AsLargeInt)
+      else
+        result := 'Nicht vorhanden';
+    end
+    else
+    begin
+      result := 'X';
+    end;
+  finally
+    Q.Free;
+  end;
+end;
+
+
+
+end.

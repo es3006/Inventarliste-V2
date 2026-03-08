@@ -1,0 +1,752 @@
+﻿unit uLizenzTools;
+
+interface
+
+uses
+  Winapi.Windows, System.SysUtils, System.Classes, System.UITypes, AnsiStrings,
+  VCL.Forms, IniFiles, IdHTTP, IdSSL, IdSSLOpenSSL, NB30, Dialogs,
+  IdSSLOpenSSLHeaders, IdURI, uLizenzDialog, System.Net.HttpClient,
+  System.DateUtils, uMain, uFunctions, System.JSON, System.Hash;
+
+procedure ShowLizenzDialog;
+function ShowLizenzDialogUndPruefen: Boolean;
+procedure LizenzCheck;
+function CheckLicense: Boolean;
+function LizenzInSettingsIni(Key: string): string;
+procedure SaveLizenzInSettingsINI(const Email, Code: string);
+function PruefeLizenzOnline(const Lizenzcode, Email, HWID, Programmname: string): string;
+function GetLetzterOnlineCheck: TDateTime;
+procedure SetLetzterOnlineCheck;
+function GetLizenzGueltigBis: TDateTime;
+procedure SetLizenzGueltigBis(const Value: TDateTime);
+
+implementation
+
+const
+  OFFLINE_TAGE_ERLAUBT = 3;  // Wie lange darf offline gearbeitet werden?
+
+{##############################################################
+  DEBUG LOGGING
+  Zum Deaktivieren: Diese Funktion leer lassen
+##############################################################}
+procedure DebugLog(const Msg: string);
+begin
+  // Logging deaktiviert für Production
+  // Zum Aktivieren: Kommentar entfernen und Code unten einkommentieren
+
+  (*
+  var
+    LogFile: TextFile;
+    LogPath: string;
+  begin
+    LogPath := ExtractFilePath(Application.ExeName) + 'lizenz_debug.log';
+    try
+      AssignFile(LogFile, LogPath);
+      if FileExists(LogPath) then
+        Append(LogFile)
+      else
+        Rewrite(LogFile);
+
+      WriteLn(LogFile, FormatDateTime('yyyy-mm-dd hh:nn:ss', Now) + ' - ' + Msg);
+      CloseFile(LogFile);
+    except
+      // Logging-Fehler ignorieren
+    end;
+  *)
+end;
+
+var
+  GLizenzErforderlichCache: Integer = -1; // -1 = nicht geprüft, 0 = nein, 1 = ja
+
+{##############################################################
+  Prüfen ob Lizenz erforderlich ist (mit Cache)
+  Gibt False zurück wenn Server LICENSE_REQUIRED=0 sendet (Freeware)
+  WICHTIG: Löscht NICHTS, gibt nur Information zurück!
+##############################################################}
+function IstLizenzErforderlich(const Programmname: string): Boolean;
+var
+  HTTP: TIdHTTP;
+  SSL: TIdSSLIOHandlerSocketOpenSSL;
+  Antwort: string;
+begin
+  // Cache nutzen um nicht bei jedem Aufruf Server zu kontaktieren
+  if GLizenzErforderlichCache <> -1 then
+  begin
+    Result := GLizenzErforderlichCache = 1;
+    DebugLog('IstLizenzErforderlich (gecacht): ' + BoolToStr(Result, True));
+    Exit;
+  end;
+
+  DebugLog('IstLizenzErforderlich: Prüfe Server...');
+
+  HTTP := TIdHTTP.Create(nil);
+  SSL  := TIdSSLIOHandlerSocketOpenSSL.Create(nil);
+  try
+    SSL.SSLOptions.Method := sslvTLSv1_2;
+    HTTP.IOHandler := SSL;
+    HTTP.ConnectTimeout := 2000;
+    HTTP.ReadTimeout := 2000;
+
+    try
+      Antwort := Trim(HTTP.Get('https://lizenz.ensacom.de/api/app_status.php?app=' + Programmname));
+      DebugLog('  Server-Antwort: ' + Antwort);
+
+      if Antwort = 'LICENSE_REQUIRED=0' then
+      begin
+        DebugLog('  -> Lizenz NICHT erforderlich (Freeware-Modus)');
+        Result := False;
+        GLizenzErforderlichCache := 0;
+      end
+      else
+      begin
+        DebugLog('  -> Lizenz erforderlich');
+        Result := True;
+        GLizenzErforderlichCache := 1;
+      end;
+    except
+      on E: Exception do
+      begin
+        DebugLog('  Server nicht erreichbar: ' + E.Message);
+        // Server nicht erreichbar → Lizenz ist trotzdem erforderlich
+        Result := True;
+        GLizenzErforderlichCache := 1;
+      end;
+    end;
+  finally
+    SSL.Free;
+    HTTP.Free;
+  end;
+end;
+
+{##############################################################
+  Manipulationssichere Speicherung des Ablaufdatums
+##############################################################}
+function ErstelleLizenzHash(const Datum: TDateTime; const HWID: string): string;
+var
+  Daten: string;
+  FormatSettings: TFormatSettings;
+begin
+  // Verwende invariante Format-Einstellungen um Locale-Probleme zu vermeiden
+  FormatSettings := TFormatSettings.Create('en-US');
+
+  // WICHTIG: HWID wird NICHT im Hash verwendet, weil sie sich ändern kann!
+  // (z.B. wenn Netzwerkadapter wechselt, VPN, WLAN vs LAN)
+  // Stattdessen: Datum + Programmname + geheimer Salt
+  Daten := FormatDateTime('yyyy-mm-dd hh:nn:ss', Datum, FormatSettings) +
+           '|' + ExtractFileName(Application.ExeName) +
+           '|GEHEIMER_SALT_2026'; // Ändere diesen Wert zu einem eigenen geheimen String
+
+  Result := THashSHA2.GetHashString(Daten, SHA256);
+
+  DebugLog('ErstelleLizenzHash: Daten="' + Daten + '"');
+end;
+
+function VerifiziereLizenzHash(const Datum: TDateTime; const HWID, Hash: string): Boolean;
+var
+  BerechnetterHash: string;
+begin
+  BerechnetterHash := ErstelleLizenzHash(Datum, HWID);
+  Result := SameText(BerechnetterHash, Hash);
+
+  DebugLog('VerifiziereLizenzHash:');
+  DebugLog('  Erwartet: ' + Hash);
+  DebugLog('  Berechnet: ' + BerechnetterHash);
+  DebugLog('  Match: ' + BoolToStr(Result, True));
+end;
+
+{##############################################################
+  Speichern des Ablaufdatums mit Manipulationsschutz
+##############################################################}
+procedure SetLizenzGueltigBis(const Value: TDateTime);
+var
+  Ini: TIniFile;
+  Hash: string;
+  HWID: string;
+begin
+  HWID := GetHWID;
+  Hash := ErstelleLizenzHash(Value, HWID);
+
+  DebugLog('SetLizenzGueltigBis: ' + DateToStr(Value));
+
+  Ini := TIniFile.Create(ExtractFilePath(Application.ExeName) + 'settings.ini');
+  try
+    Ini.WriteDateTime('Lizenz', 'GueltigBis', Value);
+    Ini.WriteString('Lizenz', 'Hash', Hash);
+  finally
+    Ini.Free;
+  end;
+end;
+
+{##############################################################
+  Auslesen des Ablaufdatums mit Manipulationsprüfung
+  WICHTIG: Löscht NIEMALS etwas!
+##############################################################}
+function GetLizenzGueltigBis: TDateTime;
+var
+  Ini: TIniFile;
+  Datum: TDateTime;
+  Hash, HWID: string;
+begin
+  Ini := TIniFile.Create(ExtractFilePath(Application.ExeName) + 'settings.ini');
+  try
+    Datum := Ini.ReadDateTime('Lizenz', 'GueltigBis', 0);
+    Hash := Ini.ReadString('Lizenz', 'Hash', '');
+
+    DebugLog('GetLizenzGueltigBis: Datum=' + DateToStr(Datum) + ', Hash=' + Copy(Hash, 1, 20));
+
+    // Wenn kein Datum vorhanden ist
+    if Datum = 0 then
+    begin
+      DebugLog('  -> Kein Datum vorhanden, Return 0');
+      Exit(0);
+    end;
+
+    // Wenn Datum vorhanden aber kein Hash (noch nicht gesetzt)
+    if Hash = '' then
+    begin
+      DebugLog('  -> Kein Hash vorhanden (noch nicht online geprüft), Return 0');
+      Exit(0);
+    end;
+
+    // Jetzt HWID holen für Hash-Verifizierung
+    HWID := GetHWID;
+
+    // Hash verifizieren
+    if not VerifiziereLizenzHash(Datum, HWID, Hash) then
+    begin
+      DebugLog('  -> WARNUNG: Hash ungültig! Manipulation erkannt!');
+      // Bei Manipulation: Datum als ungültig markieren, aber NICHTS löschen
+      Exit(0);
+    end;
+
+    DebugLog('  -> Hash OK, Return ' + DateToStr(Datum));
+    Result := Datum;
+  finally
+    Ini.Free;
+  end;
+end;
+
+{##############################################################
+  Prüfen ob Internet verfügbar ist
+##############################################################}
+function IstInternetVerfuegbar: Boolean;
+var
+  HTTP: TIdHTTP;
+  SSL: TIdSSLIOHandlerSocketOpenSSL;
+begin
+  Result := False;
+  HTTP := TIdHTTP.Create(nil);
+  SSL := TIdSSLIOHandlerSocketOpenSSL.Create(nil);
+  try
+    SSL.SSLOptions.Method := sslvTLSv1_2;
+    HTTP.IOHandler := SSL;
+    HTTP.ConnectTimeout := 1500;
+    HTTP.ReadTimeout := 1500;
+
+    try
+      HTTP.Head('https://lizenz.ensacom.de/api/ping.php');
+      Result := True;
+      DebugLog('IstInternetVerfuegbar: JA');
+    except
+      DebugLog('IstInternetVerfuegbar: NEIN');
+      // Result bleibt False
+    end;
+  finally
+    SSL.Free;
+    HTTP.Free;
+  end;
+end;
+
+{##############################################################
+  Lizenz-Check beim Programmstart
+##############################################################}
+procedure LizenzCheck;
+var
+  LizenzCode, LizenzMail, Programmname: string;
+  AblaufDatum: TDateTime;
+begin
+  DebugLog('=== LizenzCheck START ===');
+
+  Programmname := ChangeFileExt(ExtractFileName(Application.ExeName), '');
+
+  // WICHTIG: Zuerst prüfen ob Lizenz überhaupt erforderlich ist!
+  if not IstLizenzErforderlich(Programmname) then
+  begin
+    DebugLog('Lizenz ist NICHT erforderlich (Freeware-Modus) - überspringe alle Prüfungen');
+    DebugLog('=== LizenzCheck ENDE (Freeware) ===');
+    Exit;
+  end;
+
+  LizenzCode := LizenzInSettingsIni('Code');
+  LizenzMail := LizenzInSettingsIni('Email');
+  AblaufDatum := GetLizenzGueltigBis;
+
+  DebugLog('  Email=' + LizenzMail + ', Code=' + Copy(LizenzCode, 1, 10) + '...');
+
+  // SZENARIO 1: Keine Lizenzdaten vorhanden
+  if (LizenzCode = '') or (LizenzMail = '') then
+  begin
+    DebugLog('  -> Keine Lizenzdaten, zeige Dialog');
+    ShowLizenzDialog;
+    Exit;
+  end;
+
+  // SZENARIO 2: Ablaufdatum in Vergangenheit
+  if (AblaufDatum > 0) and (Now > AblaufDatum) then
+  begin
+    DebugLog('  -> Ablaufdatum in Vergangenheit, zeige Dialog');
+    ShowMessage('Ihre Lizenz ist abgelaufen. Bitte geben Sie einen gültigen Lizenzcode ein.');
+    ShowLizenzDialog;
+    Exit;
+  end;
+
+  DebugLog('=== LizenzCheck ENDE (OK) ===');
+end;
+
+{##############################################################
+  Lizenz-Dialog anzeigen
+##############################################################}
+procedure ShowLizenzDialog;
+var
+  dlg: TfLizenzDialog;
+begin
+  DebugLog('ShowLizenzDialog aufgerufen');
+
+  dlg := TfLizenzDialog.Create(nil);
+  try
+    dlg.edEmail.Text := LizenzInSettingsIni('Email');
+    dlg.edLizenzcode.Text := LizenzInSettingsIni('Code');
+
+    if dlg.ShowModal = mrOk then
+    begin
+      DebugLog('Dialog: OK geklickt');
+      Application.Restore;
+      if Assigned(Application.MainForm) then
+      begin
+        Application.MainForm.Show;
+        Application.MainForm.WindowState := wsNormal;
+        Application.MainForm.BringToFront;
+      end;
+    end
+    else
+    begin
+      DebugLog('Dialog: Abbrechen geklickt');
+      Application.Terminate;
+    end;
+  finally
+    dlg.Free;
+  end;
+end;
+
+{##############################################################
+  Lizenz-Dialog anzeigen UND prüfen ob gültige Lizenz eingegeben wurde
+  Gibt True zurück wenn gültige Lizenz, False wenn nicht
+##############################################################}
+function ShowLizenzDialogUndPruefen: Boolean;
+var
+  dlg: TfLizenzDialog;
+  AblaufDatum: TDateTime;
+begin
+  Result := False;
+  DebugLog('ShowLizenzDialogUndPruefen aufgerufen');
+
+  dlg := TfLizenzDialog.Create(nil);
+  try
+    dlg.edEmail.Text := LizenzInSettingsIni('Email');
+    dlg.edLizenzcode.Text := LizenzInSettingsIni('Code');
+
+    if dlg.ShowModal = mrOk then
+    begin
+      DebugLog('Dialog: OK geklickt');
+
+      // Prüfen ob neue Lizenz gültig ist
+      AblaufDatum := GetLizenzGueltigBis;
+
+      if AblaufDatum > 0 then
+      begin
+        if Now <= AblaufDatum then
+        begin
+          DebugLog('Neue Lizenz ist gültig!');
+          Result := True;
+        end
+        else
+        begin
+          DebugLog('Neue Lizenz ist bereits abgelaufen');
+          ShowMessage('Die eingegebene Lizenz ist bereits abgelaufen.');
+          // Result bleibt False
+        end;
+      end
+      else
+      begin
+        DebugLog('Kein gültiges Ablaufdatum in neuer Lizenz');
+        // Result bleibt False
+      end;
+
+      if Result then
+      begin
+        Application.Restore;
+        if Assigned(Application.MainForm) then
+        begin
+          Application.MainForm.Show;
+          Application.MainForm.WindowState := wsNormal;
+          Application.MainForm.BringToFront;
+        end;
+      end;
+    end
+    else
+    begin
+      DebugLog('Dialog: Abbrechen geklickt');
+      Application.Terminate;
+      // Result bleibt False
+    end;
+  finally
+    dlg.Free;
+  end;
+end;
+
+{##############################################################
+  Hauptfunktion: Lizenz prüfen
+##############################################################}
+function CheckLicense: Boolean;
+var
+  Antwort, Status, Grund, Programmname: string;
+  LizenzCode, LizenzMail, HWID: string;
+  AblaufDatum: TDateTime;
+begin
+  DebugLog('=== CheckLicense START ===');
+
+  Programmname := ChangeFileExt(ExtractFileName(Application.ExeName), '');
+
+  // WICHTIG: Zuerst prüfen ob Lizenz überhaupt erforderlich ist!
+  if not IstLizenzErforderlich(Programmname) then
+  begin
+    DebugLog('Lizenz ist NICHT erforderlich (Freeware-Modus) - überspringe alle Prüfungen');
+    DebugLog('=== CheckLicense ENDE (Freeware) ===');
+    Exit(True); // Programm darf starten
+  end;
+
+  Result := False;
+
+  LizenzCode   := LizenzInSettingsIni('Code');
+  LizenzMail   := LizenzInSettingsIni('Email');
+  HWID         := GetHWID;
+
+  // Validierung
+  if Trim(HWID) = '' then
+  begin
+    DebugLog('FEHLER: Keine HWID');
+    ShowMessage('Keine HWID erkannt');
+    Exit;
+  end;
+
+  if Trim(Programmname) = '' then
+  begin
+    DebugLog('FEHLER: Kein Programmname');
+    ShowMessage('Keinen Programmnamen erkannt');
+    Exit;
+  end;
+
+  // Lokales Ablaufdatum prüfen
+  AblaufDatum := GetLizenzGueltigBis;
+
+  if (AblaufDatum > 0) and (Now > AblaufDatum) then
+  begin
+    DebugLog('Ablaufdatum überschritten - zeige Dialog für neue Lizenz');
+    ShowMessage('Ihre Lizenz ist am ' + DateToStr(AblaufDatum) + ' abgelaufen.' + #13#10 +
+                'Bitte geben Sie einen gültigen Lizenzcode ein.');
+
+    if ShowLizenzDialogUndPruefen then
+    begin
+      // Neue gültige Lizenz wurde eingegeben!
+      // Variablen neu laden und weitermachen
+      LizenzCode := LizenzInSettingsIni('Code');
+      LizenzMail := LizenzInSettingsIni('Email');
+      AblaufDatum := GetLizenzGueltigBis;
+      DebugLog('Neue Lizenz eingegeben, fahre fort');
+    end
+    else
+    begin
+      DebugLog('Keine gültige Lizenz nach Dialog-Eingabe');
+      Exit(False);
+    end;
+  end;
+
+  // ============================================================
+  // ONLINE-CHECK
+  // ============================================================
+
+  // WICHTIG: Wenn Internet verfügbar ist, IMMER prüfen!
+  // So können deaktivierte Lizenzen sofort erkannt werden
+  if IstInternetVerfuegbar then
+  begin
+    DebugLog('Starte Online-Check (Internet verfügbar)...');
+    Antwort := PruefeLizenzOnline(LizenzCode, LizenzMail, HWID, Programmname);
+    DebugLog('Server-Antwort: ' + Antwort);
+
+    // Antwort parsen
+    if Pos('|', Antwort) > 0 then
+    begin
+      Status := Copy(Antwort, 1, Pos('|', Antwort) - 1);
+      Grund  := Copy(Antwort, Pos('|', Antwort) + 1, MaxInt);
+
+      if (Grund <> '') and TryISO8601ToDate(Grund, AblaufDatum) then
+        SetLizenzGueltigBis(AblaufDatum);
+    end
+    else
+    begin
+      Status := Antwort;
+      Grund := '';
+    end;
+
+    // Online-Check erfolgreich
+    if Status = 'OK' then
+    begin
+      SetLetzterOnlineCheck;
+
+      if Assigned(fMain) and Assigned(fMain.StatusBar1) then
+        fMain.StatusBar1.Panels[0].Text := 'Lizenz gültig bis ' + DateToStr(AblaufDatum);
+
+      DebugLog('=== CheckLicense ENDE (Online OK) ===');
+      Result := True;
+      Exit;
+    end;
+
+    // Schwerwiegende Fehler - zeige Dialog zur Neueingabe
+    if Status = 'INACTIVE' then
+    begin
+      DebugLog('Server: INACTIVE - zeige Dialog');
+      ShowMessage('Lizenz wurde deaktiviert: ' + Grund + #13#10 +
+                  'Bitte geben Sie einen gültigen Lizenzcode ein.');
+
+      if ShowLizenzDialogUndPruefen then
+      begin
+        DebugLog('Neue Lizenz eingegeben - Neustart erforderlich');
+        ShowMessage('Neue Lizenz gespeichert. Bitte starten Sie das Programm neu.');
+      end;
+      Exit(False);
+    end;
+
+    if Status = 'EXPIRED' then
+    begin
+      DebugLog('Server: EXPIRED - zeige Dialog');
+      ShowMessage('Ihre Lizenz ist abgelaufen.' + #13#10 +
+                  'Bitte geben Sie einen gültigen Lizenzcode ein.');
+
+      if ShowLizenzDialogUndPruefen then
+      begin
+        DebugLog('Neue Lizenz eingegeben - Neustart erforderlich');
+        ShowMessage('Neue Lizenz gespeichert. Bitte starten Sie das Programm neu.');
+      end;
+      Exit(False);
+    end;
+
+    if Status = 'NOT_YET_VALID' then
+    begin
+      DebugLog('Server: NOT_YET_VALID');
+      ShowMessage('Lizenz ist noch nicht gültig.');
+      Exit(False);
+    end;
+
+    if Status = 'INVALID' then
+    begin
+      DebugLog('Server: INVALID - zeige Dialog');
+      ShowMessage('E-Mail oder Lizenzcode ungültig.' + #13#10 +
+                  'Bitte überprüfen Sie Ihre Eingaben.');
+
+      if ShowLizenzDialogUndPruefen then
+      begin
+        DebugLog('Korrigierte Lizenz eingegeben - Neustart erforderlich');
+        ShowMessage('Lizenz gespeichert. Bitte starten Sie das Programm neu.');
+      end;
+      Exit(False);
+    end;
+
+    if Status = 'UNKNOWN_USER' then
+    begin
+      DebugLog('Server: UNKNOWN_USER');
+      ShowMessage('Unbekannte E-Mail-Adresse.');
+      Exit(False);
+    end;
+
+    if Status = 'UNKNOWN_HWID' then
+    begin
+      DebugLog('Server: UNKNOWN_HWID');
+      ShowMessage('Lizenz ist nicht für dieses Gerät registriert.');
+      Exit(False);
+    end;
+
+    if Status = 'NO_SLOT' then
+    begin
+      DebugLog('Server: NO_SLOT');
+      ShowMessage('Maximale Anzahl an Geräten erreicht.');
+      Exit(False);
+    end;
+
+    DebugLog('Server: ERROR (nicht erreichbar)');
+  end;
+
+  // ============================================================
+  // OFFLINE-MODUS
+  // ============================================================
+
+  DebugLog('OFFLINE-MODUS aktiv');
+
+  // Prüfen ob Ablaufdatum vorhanden ist
+  if AblaufDatum = 0 then
+  begin
+    // SONDERFALL: Email und Code sind vorhanden, aber noch kein Online-Check erfolgt
+    // Das passiert wenn im Dialog die Daten eingegeben wurden aber der Dialog
+    // den Online-Check gemacht hat, dann aber das Programm beendet wurde
+    // bevor CheckLicense in FormCreate laufen konnte
+    if (LizenzCode <> '') and (LizenzMail <> '') then
+    begin
+      DebugLog('Kein Ablaufdatum, aber Email/Code vorhanden -> Internet für ersten Check erforderlich');
+      ShowMessage('Bitte stellen Sie eine Internetverbindung her, um Ihre Lizenz zu aktivieren.');
+      Exit(False);
+    end;
+
+    DebugLog('Kein Ablaufdatum und keine Lizenzdaten');
+    ShowMessage('Keine gültige Lizenz gefunden. Bitte stellen Sie eine Internetverbindung her.');
+    Exit(False);
+  end;
+
+  // Prüfen ob Ablaufdatum noch gültig ist
+  if Now > AblaufDatum then
+  begin
+    DebugLog('Ablaufdatum abgelaufen im Offline-Modus - zeige Dialog');
+    ShowMessage('Ihre Lizenz ist abgelaufen.' + #13#10 +
+                'Bitte geben Sie einen gültigen Lizenzcode ein.');
+
+    if ShowLizenzDialogUndPruefen then
+    begin
+      DebugLog('Neue Lizenz eingegeben - Neustart erforderlich');
+      ShowMessage('Neue Lizenz gespeichert. Bitte starten Sie das Programm neu.');
+    end;
+    Exit(False);
+  end;
+
+  // Offline-Toleranz prüfen
+  if GetLetzterOnlineCheck > 0 then
+  begin
+    if DaysBetween(Now, GetLetzterOnlineCheck) <= OFFLINE_TAGE_ERLAUBT then
+    begin
+      // Offline-Modus OK
+      if Assigned(fMain) and Assigned(fMain.StatusBar1) then
+        fMain.StatusBar1.Panels[0].Text := 'Lizenz gültig bis ' + DateToStr(AblaufDatum) + ' (Offline)';
+
+      DebugLog('=== CheckLicense ENDE (Offline OK) ===');
+      Result := True;
+      Exit;
+    end
+    else
+    begin
+      DebugLog('Offline-Toleranz überschritten (>3 Tage)');
+      ShowMessage('Bitte stellen Sie eine Internetverbindung her, um Ihre Lizenz zu überprüfen.' + #13#10 +
+                  'Letzter Online-Check: ' + DateTimeToStr(GetLetzterOnlineCheck));
+      Exit(False);
+    end;
+  end
+  else
+  begin
+    DebugLog('Noch nie online gecheckt');
+    ShowMessage('Bitte stellen Sie eine Internetverbindung her, um Ihre Lizenz zu aktivieren.');
+    Exit(False);
+  end;
+end;
+
+{##############################################################
+  Hilfsfunktionen
+##############################################################}
+
+function LizenzInSettingsIni(Key: string): string;
+var
+  Ini: TIniFile;
+begin
+  Ini := TIniFile.Create(ExtractFilePath(Application.ExeName) + 'settings.ini');
+  try
+    Result := Ini.ReadString('Lizenz', Key, '');
+  finally
+    Ini.Free;
+  end;
+end;
+
+procedure SaveLizenzInSettingsINI(const Email, Code: string);
+var
+  Ini: TIniFile;
+begin
+  DebugLog('SaveLizenzInSettingsINI: Email=' + Email);
+
+  Ini := TIniFile.Create(ExtractFilePath(Application.ExeName) + 'settings.ini');
+  try
+    Ini.WriteString('Lizenz', 'Email', Email);
+    Ini.WriteString('Lizenz', 'Code', Code);
+  finally
+    Ini.Free;
+  end;
+end;
+
+function PruefeLizenzOnline(const Lizenzcode, Email, HWID, Programmname: string): string;
+var
+  HTTP: TIdHTTP;
+  SSL: TIdSSLIOHandlerSocketOpenSSL;
+  URL: string;
+begin
+  Result := 'ERROR';
+
+  HTTP := TIdHTTP.Create(nil);
+  SSL := TIdSSLIOHandlerSocketOpenSSL.Create(nil);
+  try
+    SSL.SSLOptions.Method := sslvTLSv1_2;
+    HTTP.IOHandler := SSL;
+    HTTP.ConnectTimeout := 3000;
+    HTTP.ReadTimeout := 5000;
+    HTTP.HandleRedirects := True;
+
+    URL := 'https://lizenz.ensacom.de/api/check_license.php'
+         + '?code=' + TIdURI.ParamsEncode(Lizenzcode)
+         + '&email=' + TIdURI.ParamsEncode(Email)
+         + '&hwid=' + TIdURI.ParamsEncode(HWID)
+         + '&app=' + TIdURI.ParamsEncode(Programmname);
+
+    try
+      Result := Trim(HTTP.Get(URL));
+    except
+      on E: Exception do
+      begin
+        DebugLog('PruefeLizenzOnline Exception: ' + E.Message);
+        Result := 'ERROR';
+      end;
+    end;
+  finally
+    SSL.Free;
+    HTTP.Free;
+  end;
+end;
+
+function GetLetzterOnlineCheck: TDateTime;
+var
+  Ini: TIniFile;
+begin
+  Ini := TIniFile.Create(ExtractFilePath(Application.ExeName) + 'settings.ini');
+  try
+    Result := Ini.ReadDateTime('Lizenz', 'LastOnlineCheck', 0);
+  finally
+    Ini.Free;
+  end;
+end;
+
+procedure SetLetzterOnlineCheck;
+var
+  Ini: TIniFile;
+begin
+  DebugLog('SetLetzterOnlineCheck: ' + DateTimeToStr(Now));
+
+  Ini := TIniFile.Create(ExtractFilePath(Application.ExeName) + 'settings.ini');
+  try
+    Ini.WriteDateTime('Lizenz', 'LastOnlineCheck', Now);
+  finally
+    Ini.Free;
+  end;
+end;
+
+end.

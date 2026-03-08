@@ -1,0 +1,91 @@
+﻿program Inventarliste;
+
+uses
+  System.SysUtils,
+  System.Classes,
+  Vcl.Forms,
+  Vcl.Dialogs,
+  Winapi.Windows,
+  uMain in 'uMain.pas' {fMain},
+  uFunctions in 'uFunctions.pas',
+  uDBFunctions in 'uDBFunctions.pas',
+  uWareneinkauf in 'uWareneinkauf.pas' {fWareneinkauf},
+  uEinheiten in 'uEinheiten.pas' {fEinheiten},
+  uVerkauf in 'uVerkauf.pas' {fVerkauf},
+  uEditWareneinkauf in 'uEditWareneinkauf.pas' {fEditWareneinkauf},
+  uSettings in 'uSettings.pas' {fSettings},
+  uHelp in 'uHelp.pas' {fHelp},
+  uUpdate in 'uUpdate.pas',
+  uAnkaufformular in 'uAnkaufformular.pas' {fAnkaufformular},
+  uZustaende in 'uZustaende.pas' {fZustaende},
+  uZahlungsarten in 'uZahlungsarten.pas' {fZahlungsarten},
+  uKunden in 'uKunden.pas' {fKunden},
+  uAnkaeufe in 'uAnkaeufe.pas' {fAnkaeufe},
+  uEditKundenankauf in 'uEditKundenankauf.pas' {fEditKundenankauf},
+  uLizenzDialog in 'uLizenzDialog.pas' {fLizenzDialog},
+  uLizenztools in 'uLizenztools.pas',
+  uEdelmetallsammelverkauf in 'uEdelmetallsammelverkauf.pas' {fEdelmetallsammelverkauf},
+  uSQLiteDateHelper in 'uSQLiteDateHelper.pas',
+  uMoneyHelper in 'uMoneyHelper.pas',
+  uSammelverkaeufe in 'uSammelverkaeufe.pas' {fSammelverkaeufe},
+  uPreisabfrage in 'uPreisabfrage.pas' {fPreisabfrage};
+
+{$R *.res}
+
+var
+  MutexHandle: THandle;
+  MutexName: string;
+  IsUpdateRestart: Boolean;
+  LogPath: string;
+
+begin
+  // ➤ Erkennung, ob das Programm durch das Update neu gestartet wurde
+  IsUpdateRestart := ParamStr(1).ToLower = '--replace';
+
+  // ➤ Wenn das Programm mit --replace gestartet wurde → Update anwenden
+  if IsUpdateRestart then
+  begin
+    ReplaceAndRestart;
+    Exit;
+  end
+  else
+  begin
+    if FileExists(ExtractFilePath(ParamStr(0)) + 'application.log') then
+      System.SysUtils.DeleteFile(LogPath);
+  end;
+
+  // ➤ Nur eine Instanz erlauben
+  MutexName := 'Global\Besucherverwaltung2';
+  MutexHandle := CreateMutex(nil, True, PChar(MutexName));
+  if GetLastError = ERROR_ALREADY_EXISTS then
+  begin
+    ShowMessage('Das Programm läuft bereits!');
+    Exit;
+  end;
+
+  try
+    Application.Initialize;
+    Application.MainFormOnTaskbar := True;
+    Application.CreateForm(TfMain, fMain);
+    Application.CreateForm(TfWareneinkauf, fWareneinkauf);
+    Application.CreateForm(TfEinheiten, fEinheiten);
+    Application.CreateForm(TfVerkauf, fVerkauf);
+    Application.CreateForm(TfEditWareneinkauf, fEditWareneinkauf);
+    Application.CreateForm(TfSettings, fSettings);
+    Application.CreateForm(TfHelp, fHelp);
+    Application.CreateForm(TfAnkaufformular, fAnkaufformular);
+    Application.CreateForm(TfZustaende, fZustaende);
+    Application.CreateForm(TfZahlungsarten, fZahlungsarten);
+    Application.CreateForm(TfKunden, fKunden);
+    Application.CreateForm(TfAnkaeufe, fAnkaeufe);
+    Application.CreateForm(TfEditKundenankauf, fEditKundenankauf);
+    Application.CreateForm(TfLizenzDialog, fLizenzDialog);
+    Application.CreateForm(TfEdelmetallsammelverkauf, fEdelmetallsammelverkauf);
+    Application.CreateForm(TfSammelverkaeufe, fSammelverkaeufe);
+    Application.CreateForm(TfPreisabfrage, fPreisabfrage);
+    Application.Run;
+  finally
+    if MutexHandle <> 0 then
+      CloseHandle(MutexHandle);
+  end;
+end.

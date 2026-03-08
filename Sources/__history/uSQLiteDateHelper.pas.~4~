@@ -1,0 +1,134 @@
+﻿unit uSQLiteDateHelper;
+
+interface
+
+uses
+  System.SysUtils, Vcl.ComCtrls, FireDAC.Stan.Param;
+
+function DateTimeToSQLiteDate(const ADate: TDateTime): string;
+function SQLiteDateToDateTime(const AValue: string; out ADate: TDateTime): Boolean;
+function SQLiteDateToDisplay(const AValue: string): string;
+procedure SetSQLiteDateParam(const AParam: TFDParam; const ADTP: TDateTimePicker);
+procedure LoadSQLiteDateToDTP(const AValue: string; const ADTP: TDateTimePicker);
+procedure LoadDisplayDateToDTP(const AValue: string; const ADTP: TDateTimePicker);
+
+
+implementation
+
+
+
+function DateTimeToSQLiteDate(const ADate: TDateTime): string;
+begin
+  Result := FormatDateTime('yyyy-mm-dd', ADate);
+end;
+
+
+
+
+function SQLiteDateToDateTime(const AValue: string; out ADate: TDateTime): Boolean;
+var
+  Y, M, D: Word;
+begin
+  Result := False;
+  if Trim(AValue) = '' then Exit;
+  if (Length(AValue) <> 10) or (AValue[5] <> '-') or (AValue[8] <> '-') then Exit;
+
+  try
+    Y := StrToInt(Copy(AValue, 1, 4));
+    M := StrToInt(Copy(AValue, 6, 2));
+    D := StrToInt(Copy(AValue, 9, 2));
+    ADate := EncodeDate(Y, M, D);
+    Result := True;
+  except
+    Result := False;
+  end;
+end;
+
+
+
+
+function SQLiteDateToDisplay(const AValue: string): string;
+var
+  DT: TDateTime;
+begin
+  if SQLiteDateToDateTime(AValue, DT) then
+    Result := FormatDateTime('dd.mm.yyyy', DT)
+  else
+    Result := '';
+end;
+
+
+
+
+procedure SetSQLiteDateParam(const AParam: TFDParam; const ADTP: TDateTimePicker);
+begin
+  if ADTP.Checked then
+    AParam.AsString := DateTimeToSQLiteDate(ADTP.Date)
+  else
+    AParam.Clear; // NULL in SQLite
+end;
+
+
+
+
+procedure LoadSQLiteDateToDTP(const AValue: string; const ADTP: TDateTimePicker);
+var
+  DT: TDateTime;
+begin
+  if SQLiteDateToDateTime(AValue, DT) then
+  begin
+    ADTP.Date := DT;
+    ADTP.Checked := True;
+  end
+  else
+  begin
+    ADTP.Date := Now;
+    ADTP.Checked := False;
+  end;
+end;
+
+
+
+
+{
+  erwartet ein Datum als Anzeige-String
+  Format: dd.mm.yyyy
+  Quelle: ListView, Label, Edit, also UI-Anzeige
+  Beispiel: "12.02.1985"
+  wandelt diesen String sicher in ein TDateTime um
+  nicht mit StrToDate (gefährlich)
+  sondern mit TryStrToDate + festen FormatSettings
+
+  immer dann verwenden, wenn:
+  Das Datum aus der UI kommt – nicht direkt aus der Datenbank
+  Typische Szenarien:
+    Klick auf ListView → Formular füllen
+    Datum kommt aus SubItems[]
+    Datum steht in einem TEdit oder TLabel
+    Anzeigeformat ist dd.mm.yyyy
+}
+procedure LoadDisplayDateToDTP(const AValue: string; const ADTP: TDateTimePicker);
+var
+  DT: TDateTime;
+  FS: TFormatSettings;
+begin
+  FS := TFormatSettings.Create;
+  FS.DateSeparator := '.';
+  FS.ShortDateFormat := 'dd.mm.yyyy';
+
+  if (AValue <> '') and TryStrToDate(AValue, DT, FS) then
+  begin
+    ADTP.Date := DT;
+    ADTP.Checked := True;
+  end
+  else
+  begin
+    ADTP.Date := Now;
+    ADTP.Checked := False;
+  end;
+end;
+
+
+
+end.
+

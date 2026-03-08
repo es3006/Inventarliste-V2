@@ -1,0 +1,30 @@
+unit uEdelmetallsammelverkauf;
+
+interface
+
+uses
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
+  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.Mask, Vcl.ExtCtrls,
+  Vcl.ComCtrls, AdvListV;
+
+type
+  TfEdelmetallsammelverkauf = class(TForm)
+    lvInventar: TAdvListView;
+    Label1: TLabel;
+    Label2: TLabel;
+    edRechnungsNr: TLabeledEdit;
+    edGesEinkaufswert: TLabeledEdit;
+  private
+    { Private-Deklarationen }
+  public
+    { Public-Deklarationen }
+  end;
+
+var
+  fEdelmetallsammelverkauf: TfEdelmetallsammelverkauf;
+
+implementation
+
+{$R *.dfm}
+
+end.
