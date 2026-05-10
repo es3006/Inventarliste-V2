@@ -111,12 +111,11 @@ begin
     try
       Q.Connection := fMain.FDConnection1;
       Q.SQL.Text :=
-        'SELECT  K.KundenNr, K.Nachname, K.Vorname, ' +
-		    'A.id AS AnkaufID, A.Ankaufsdatum, A.Gesamtpreis, A.Artikelname, ' +
-		    'A.Einheit, A.Karat, A.Gewicht ' +
-	      'FROM AnkaufEdelmetall AS A ' +
-	      'LEFT JOIN kundendaten AS K ON K.id = A.kundenID ' +
-	      'WHERE A.verkaufID = :VERKAUFID';
+        'SELECT id AS AnkaufID, Ankaufsdatum, Gesamtpreis, Artikelname, ' +
+		    'Einheit, Karat, Gewicht, Nachname, Vorname ' +
+	      'FROM AnkaufEdelmetall ' +
+	      'WHERE verkaufID = :VERKAUFID ' +
+        'ORDER BY id DESC';
 
       Q.ParamByName('VERKAUFID').AsInteger := VerkaufID;
       Q.Open;
@@ -125,7 +124,6 @@ begin
       begin
         Item := lvEdelmetallEinkaeufe.Items.Add;
         Item.Caption := Q.FieldByName('AnkaufID').AsString;
-        Item.SubItems.Add(Q.FieldByName('KundenNr').AsString);
         Item.SubItems.Add(Q.FieldByName('Nachname').AsString);
         Item.SubItems.Add(Q.FieldByName('Vorname').AsString);
         Item.SubItems.Add(SQLiteDateToDisplay(Q.FieldByName('Ankaufsdatum').AsString));

@@ -19,7 +19,6 @@ uses
   uAnkaufformular in 'uAnkaufformular.pas' {fAnkaufformular},
   uZustaende in 'uZustaende.pas' {fZustaende},
   uZahlungsarten in 'uZahlungsarten.pas' {fZahlungsarten},
-  uKunden in 'uKunden.pas' {fKunden},
   uAnkaeufe in 'uAnkaeufe.pas' {fAnkaeufe},
   uEditKundenankauf in 'uEditKundenankauf.pas' {fEditKundenankauf},
   uLizenzDialog in 'uLizenzDialog.pas' {fLizenzDialog},
@@ -67,23 +66,22 @@ begin
     Application.Initialize;
     Application.MainFormOnTaskbar := True;
     Application.CreateForm(TfMain, fMain);
-    Application.CreateForm(TfWareneinkauf, fWareneinkauf);
-    Application.CreateForm(TfEinheiten, fEinheiten);
-    Application.CreateForm(TfVerkauf, fVerkauf);
-    Application.CreateForm(TfEditWareneinkauf, fEditWareneinkauf);
-    Application.CreateForm(TfSettings, fSettings);
-    Application.CreateForm(TfHelp, fHelp);
-    Application.CreateForm(TfAnkaufformular, fAnkaufformular);
-    Application.CreateForm(TfZustaende, fZustaende);
-    Application.CreateForm(TfZahlungsarten, fZahlungsarten);
-    Application.CreateForm(TfKunden, fKunden);
-    Application.CreateForm(TfAnkaeufe, fAnkaeufe);
-    Application.CreateForm(TfEditKundenankauf, fEditKundenankauf);
-    Application.CreateForm(TfLizenzDialog, fLizenzDialog);
-    Application.CreateForm(TfEdelmetallsammelverkauf, fEdelmetallsammelverkauf);
-    Application.CreateForm(TfSammelverkaeufe, fSammelverkaeufe);
-    Application.CreateForm(TfPreisabfrage, fPreisabfrage);
-    Application.Run;
+  Application.CreateForm(TfWareneinkauf, fWareneinkauf);
+  Application.CreateForm(TfEinheiten, fEinheiten);
+  Application.CreateForm(TfVerkauf, fVerkauf);
+  Application.CreateForm(TfEditWareneinkauf, fEditWareneinkauf);
+  Application.CreateForm(TfSettings, fSettings);
+  Application.CreateForm(TfHelp, fHelp);
+  Application.CreateForm(TfAnkaufformular, fAnkaufformular);
+  Application.CreateForm(TfZustaende, fZustaende);
+  Application.CreateForm(TfZahlungsarten, fZahlungsarten);
+  Application.CreateForm(TfAnkaeufe, fAnkaeufe);
+  Application.CreateForm(TfEditKundenankauf, fEditKundenankauf);
+  Application.CreateForm(TfLizenzDialog, fLizenzDialog);
+  Application.CreateForm(TfEdelmetallsammelverkauf, fEdelmetallsammelverkauf);
+  Application.CreateForm(TfSammelverkaeufe, fSammelverkaeufe);
+  Application.CreateForm(TfPreisabfrage, fPreisabfrage);
+  Application.Run;
   finally
     if MutexHandle <> 0 then
       CloseHandle(MutexHandle);

@@ -11,9 +11,9 @@ ANKAUFSFORMULAR_CONTENT_UHR TXT ".\Formulare\AnkaufsformularUhr\CONTENT_UHR.txt"
 ANKAUFSFORMULAR_FOOTER_UHR TXT ".\Formulare\AnkaufsformularUhr\FOOTER_UHR.txt"
 
 
-ANKAUFSFORMULAR_HEADER TXT ".\Formulare\Ankaufsformular\HEADER.txt" 
-ANKAUFSFORMULAR_CONTENT TXT ".\Formulare\Ankaufsformular\CONTENT.txt"
-ANKAUFSFORMULAR_FOOTER TXT ".\Formulare\Ankaufsformular\FOOTER.txt"
+ANKAUFSFORMULAR_HEADER_INVENTAR TXT ".\Formulare\AnkaufsformularInventar\HEADER_INVENTAR.txt" 
+ANKAUFSFORMULAR_CONTENT_INVENTAR TXT ".\Formulare\AnkaufsformularInventar\CONTENT_INVENTAR.txt"
+ANKAUFSFORMULAR_FOOTER_INVENTAR TXT ".\Formulare\AnkaufsformularInventar\FOOTER_INVENTAR.txt"
 
 
 landscape RCDATA ".\Scripts\print_landscape.bat"

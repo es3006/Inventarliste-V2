@@ -4230,6 +4230,14 @@ object fMain: TfMain
                 Alignment = taRightJustify
                 Caption = 'Gewicht (g)'
                 Width = 80
+              end
+              item
+                Caption = 'Artikelname'
+                Width = 0
+              end
+              item
+                Caption = 'AnkaufBemerkung'
+                Width = 0
               end>
             Font.Charset = DEFAULT_CHARSET
             Font.Color = clWindowText
@@ -4241,8 +4249,12 @@ object fMain: TfMain
             ReadOnly = True
             RowSelect = True
             ParentFont = False
+            ParentShowHint = False
+            ShowHint = True
             TabOrder = 0
             ViewStyle = vsReport
+            OnInfoTip = lvEdelmetallInfoTip
+            OnSelectItem = lvEdelmetallSelectItem
             FilterTimeOut = 0
             PrintSettings.DateFormat = 'dd/mm/yyyy'
             PrintSettings.Font.Charset = DEFAULT_CHARSET
@@ -4422,6 +4434,9 @@ object fMain: TfMain
       object Inventarliste1: TMenuItem
         Action = acExportAsCSV
       end
+      object InventarlistealsExcelDateiexportieren1: TMenuItem
+        Action = acExportAsExcel
+      end
       object N3: TMenuItem
         Caption = '-'
       end
@@ -4446,10 +4461,6 @@ object fMain: TfMain
     end
     object Kunden1: TMenuItem
       Caption = 'Datenbestand'
-      object Kundendaten1: TMenuItem
-        Caption = 'Kundendaten'
-        OnClick = Kundendaten1Click
-      end
       object mAnkaeufe: TMenuItem
         Caption = 'Ank'#228'ufe'
         OnClick = mAnkaeufeClick
@@ -4580,6 +4591,11 @@ object fMain: TfMain
       Caption = 'Hinweisfenster'
       ShortCut = 112
       OnExecute = acHinweisfensterExecute
+    end
+    object acExportAsExcel: TAction
+      Caption = 'Inventarliste als Excel Datei exportieren'
+      OnExecute = acExportAsExcelExecute
+      OnUpdate = acExportAsExcelUpdate
     end
   end
   object tmStatusBar: TTimer

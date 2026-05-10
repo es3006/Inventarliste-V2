@@ -1,6 +1,7 @@
 object fEdelmetallsammelverkauf: TfEdelmetallsammelverkauf
   Left = 0
   Top = 0
+  BorderStyle = bsDialog
   Caption = 'Edelmetall Sammelverkauf'
   ClientHeight = 402
   ClientWidth = 897
@@ -109,8 +110,6 @@ object fEdelmetallsammelverkauf: TfEdelmetallsammelverkauf
     Font.Style = [fsBold]
     ParentFont = False
     TabOrder = 5
-    ExplicitTop = -6
-    ExplicitWidth = 864
   end
   object lvEdelmetallEinkaeufe: TAdvListView
     Left = 0
@@ -129,9 +128,6 @@ object fEdelmetallsammelverkauf: TfEdelmetallsammelverkauf
         Alignment = taCenter
         Caption = 'SKU'
         Width = 70
-      end
-      item
-        Caption = 'Ref'
       end
       item
         Caption = 'Angekauft von'
@@ -226,7 +222,6 @@ object fEdelmetallsammelverkauf: TfEdelmetallsammelverkauf
     DetailView.Font.Name = 'Segoe UI'
     DetailView.Font.Style = []
     Version = '1.9.1.1'
-    ExplicitWidth = 864
   end
   object Panel2: TPanel
     Left = 0
@@ -236,9 +231,6 @@ object fEdelmetallsammelverkauf: TfEdelmetallsammelverkauf
     Align = alTop
     ShowCaption = False
     TabOrder = 7
-    ExplicitLeft = 8
-    ExplicitTop = 8
-    ExplicitWidth = 864
     object Label4: TLabel
       Left = 8
       Top = 12
@@ -261,9 +253,6 @@ object fEdelmetallsammelverkauf: TfEdelmetallsammelverkauf
     Align = alTop
     ShowCaption = False
     TabOrder = 8
-    ExplicitLeft = 80
-    ExplicitTop = 287
-    ExplicitWidth = 185
     object Label1: TLabel
       Left = 8
       Top = 12

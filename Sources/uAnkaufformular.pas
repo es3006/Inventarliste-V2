@@ -13,23 +13,14 @@ uses
 type
   TfAnkaufformular = class(TForm)
     Panel4: TPanel;
-    edKundenNr: TLabeledEdit;
     edVorname: TLabeledEdit;
     edNachname: TLabeledEdit;
     edStrasseHausNr: TLabeledEdit;
     edPLZ: TLabeledEdit;
     edWohnort: TLabeledEdit;
     edTelefon: TLabeledEdit;
-    edHandy: TLabeledEdit;
     edEmail: TLabeledEdit;
-    edAusweisnr: TLabeledEdit;
-    dtpGeburtsdatum: TDateTimePicker;
-    Label8: TLabel;
-    sbNextKdNr: TSpeedButton;
-    Panel1: TPanel;
-    edKundensuche: TLabeledEdit;
-    btnKundensuche: TButton;
-    AdvPageControl2: TAdvPageControl;
+    PageControlArtikel: TAdvPageControl;
     AdvTabSheet2: TAdvTabSheet;
     AdvTabSheet3: TAdvTabSheet;
     Panel3: TPanel;
@@ -59,46 +50,46 @@ type
     edVersand: TLabeledEdit;
     Label10: TLabel;
     edGesamtbetrag: TLabeledEdit;
-    rbAddToInventarliste: TRadioButton;
-    rbEdelmetallSammelverkauf: TRadioButton;
     btnAddNewItem: TButton;
-    AdvListView1: TAdvListView;
-    btnSaveAnkauf: TButton;
+    lvAnkaufartikel: TAdvListView;
     btnKaufBeenden: TButton;
-    edReferenz: TLabeledEdit;
     edSKU: TLabeledEdit;
     sbNextSKU: TSpeedButton;
     dtpAnkaufsdatum: TDateTimePicker;
     Label1: TLabel;
     Label2: TLabel;
+    edReferenz: TLabeledEdit;
+    rbEdelmetallSammelverkauf: TRadioButton;
+    rbAddToInventarliste: TRadioButton;
+    btnAnkaufBeenden: TButton;
+    Label5: TLabel;
     procedure FormShow(Sender: TObject);
     procedure cbZustandSelect(Sender: TObject);
     procedure cbZahlungsartenSelect(Sender: TObject);
-    procedure btnKundensucheClick(Sender: TObject);
-    procedure edKundensucheKeyPress(Sender: TObject; var Key: Char);
     procedure edNachnameKeyUp(Sender: TObject; var Key: Word; Shift: TShiftState);
-    procedure btnSaveAnkaufClick(Sender: TObject);
-    procedure edAnkaufspreisChange(Sender: TObject);
     procedure edAnkaufspreisKeyPress(Sender: TObject; var Key: Char);
     procedure edPLZKeyPress(Sender: TObject; var Key: Char);
     procedure edTelefonKeyPress(Sender: TObject; var Key: Char);
     procedure sbNextSKUClick(Sender: TObject);
     procedure AdvPageControl1CanChange(Sender: TObject; FromPage, ToPage: Integer; var AllowChange: Boolean);
     procedure FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
-    procedure sbNextKdNrClick(Sender: TObject);
     procedure rbUhrClick(Sender: TObject);
     procedure rbSchmuckClick(Sender: TObject);
     procedure edGewichtExit(Sender: TObject);
     procedure FormActivate(Sender: TObject);
     procedure btnKaufBeendenClick(Sender: TObject);
+    procedure btnAddNewItemClick(Sender: TObject);
+    procedure rbAddToInventarlisteClick(Sender: TObject);
+    procedure btnAnkaufBeendenClick(Sender: TObject);
   private
-    procedure LoadKundendatenBySuchbegriff(const AConnection: TFDConnection; const Suchbegriff: string);
+    function GetNextSKUFromListView(lv: TListView; art: string): string;
     procedure CreateAnkaufsformularAsPDF;
     procedure CreateAnkaufsformularEdelmetalleAsPDF(const Pfad: string);
-    procedure InsertKundeInKundendaten;
-    procedure UpdateKundeInKundendaten;
-    procedure InsertDataInInventar;
-    procedure InsertDataInAnkaufEdelmetall;
+    procedure CreateAnkaufsformularInventarAsPDF(const Pfad: string);
+    procedure InsertDataInInventar(Item: TListItem; VersandAnteil: Int64);
+    procedure InsertDataInAnkaufEdelmetall(Item: TListItem; VersandAnteil: Int64);
+    procedure RecalcGesamtbetrag;
+    procedure edVersandExit(Sender: TObject);
   public
     { Public-Deklarationen }
   end;
@@ -110,7 +101,7 @@ var
   KUNDENNR: string;
   NEUERKUNDE, KUNDENDATENEDITED: boolean;
   Ankaufformular_LastID: integer;
-  BlinkCount: Integer;
+
 
 
 implementation
@@ -122,9 +113,40 @@ uses
 
 
 
+function TfAnkaufformular.GetNextSKUFromListView(lv: TListView; art: string): string;
+var
+  i, num: Integer;
+  prefix, value: string;
+begin
+  Result := '';
 
-procedure TfAnkaufformular.AdvPageControl1CanChange(Sender: TObject; FromPage,
-  ToPage: Integer; var AllowChange: Boolean);
+  if art = 'inventar' then
+    prefix := 'AK'
+  else
+    prefix := 'EM';
+
+  for i := lv.Items.Count - 1 downto 0 do
+  begin
+    if lv.Items[i].SubItems.Count > 0 then
+    begin
+      value := lv.Items[i].SubItems[0];
+
+      if value.StartsWith(prefix) then
+      begin
+        num := StrToIntDef(Copy(value, 3, MaxInt), 0);
+        Inc(num);
+        Result := prefix + Format('%.6d', [num]);
+        Exit;
+      end;
+    end;
+  end;
+end;
+
+
+
+
+
+procedure TfAnkaufformular.AdvPageControl1CanChange(Sender: TObject; FromPage, ToPage: Integer; var AllowChange: Boolean);
 begin
  if(KUNDENID <= 0) then
  begin
@@ -133,22 +155,13 @@ begin
  end;
 end;
 
-procedure TfAnkaufformular.btnKaufBeendenClick(Sender: TObject);
-begin
-  AdvPageControl2.ActivePageIndex := 1;
-end;
-
-procedure TfAnkaufformular.btnKundensucheClick(Sender: TObject);
-begin
-  LoadKundendatenBySuchbegriff(fMain.FDConnection1, edKundensuche.Text);
-end;
 
 
 
-
-
-
-procedure TfAnkaufformular.btnSaveAnkaufClick(Sender: TObject);
+procedure TfAnkaufformular.btnAddNewItemClick(Sender: TObject);
+var
+  Item: TListItem;
+  sku, art, prefix: string;
 begin
   if(Trim(edNachname.Text) = '') AND (Trim(edVorname.Text) = '') then
   begin
@@ -163,6 +176,12 @@ begin
     end;
   end;
 
+  if TrimEdit(edArtikelname) = '' then
+  begin
+    ShowMessage('Bitte geben Sie einen Artikelnamen ein!');
+    edArtikelname.SetFocus;
+    Exit;
+  end;
 
   if TrimEdit(edAnkaufspreis) = '' then
   begin
@@ -170,7 +189,6 @@ begin
     edAnkaufspreis.SetFocus;
     Exit;
   end;
-
 
   if not (rbEdelmetallSammelverkauf.Checked) AND not (rbAddToInventarliste.Checked) then
   begin
@@ -188,7 +206,7 @@ begin
 
     if(trim(edGewicht.Text) = '') then
     begin
-      showmessage('Bitte gebene Sie das Gewicht ein!');
+      showmessage('Bitte geben Sie das Gewicht ein!');
       edGewicht.SetFocus;
       exit;
     end;
@@ -199,220 +217,233 @@ begin
       edKarat.SetFocus;
       exit;
     end;
-
-    if(cbZahlungsarten.ItemIndex < 0) then
-    begin
-      showmessage('Bitte wählen Sie eine Zahlungsart aus');
-      cbZahlungsarten.SetFocus;
-      exit;
-    end;
-
-
   end;
 
-
-
-
-{======================
-  KUNDENDATEN
-======================}
-  if (NEUERKUNDE = true) and (KUNDENID = 0) then
+  //nächste SKU ermitteln
+ if rbAddToInventarliste.Checked then
   begin
-    InsertKundeInKundendaten;
+    art := 'inventar';
+    prefix := 'AK';
   end
   else
   begin
-    if(KUNDENDATENEDITED = true) then
-      UpdateKundeInKundendaten;
+    art := 'edelmetall';
+    prefix := 'EM';
   end;
 
+  // zuerst versuchen aus der ListView zu ermitteln
+  sku := GetNextSKUFromListView(lvAnkaufartikel, art);
 
-{================================
-  ANKAUFSDATEN - INVENTARLISTE
-================================}
-  if(rbAddToInventarliste.Checked) then
+  // wenn nichts gefunden wurde -> Datenbank
+  if Trim(sku) = '' then
   begin
-    edSKU.Text := GetLastSKUFromTable(fMain.FDConnection1, 'inventar', 'AK');
-    InsertDataInInventar;
-    fMain.LoadInventarToListView;
-    if(rbUhr.Checked) then
-      CreateAnkaufsformularAsPDF
+    if art = 'inventar' then
+      sku := GetNextSKUFromTable(fMain.FDConnection1, 'inventar', prefix, 6)
     else
+      sku := GetNextSKUFromTable(fMain.FDConnection1, 'ankaufEdelmetall', prefix, 6);
+  end;
+
+  if Trim(sku) = '' then
+    edSKU.Text := STARTSKU_ANKAUF
+  else
+    edSKU.Text := Trim(sku);
+
+  //Artikel in ListView einfügen
+  lvAnkaufArtikel.Items.BeginUpdate;
+  try
+    Item := lvAnkaufArtikel.Items.Add;
+
+    Item.Caption := art;
+    Item.SubItems.Add(sku);
+    Item.SubItems.Add(trim(edArtikelname.Text));
+    Item.SubItems.Add(trim(edEinkaufBemerkung.Text));
+    Item.SubItems.Add(trim(cbEinheiten.Text));
+    Item.SubItems.Add(trim(edGewicht.Text));
+    Item.SubItems.Add(trim(edKarat.Text));
+    Item.SubItems.Add(trim(edAnkaufspreis.Text));
+    Item.SubItems.Add(trim(edMarke.Text));
+    Item.SubItems.Add(trim(edModel.Text));
+    Item.SubItems.Add(trim(edJahr.Text));
+    Item.SubItems.Add(trim(cbZustand.Text));
+    Item.SubItems.Add(trim(edReferenz.Text));
+    Item.SubItems.Add(IntToStr(ord(cbBox.checked)));
+    Item.SubItems.Add(IntToStr(ord(cbPapiere.checked)));
+  finally
+    lvAnkaufArtikel.Items.EndUpdate;
+  end;
+
+  // Gesamtbetrag nach Hinzufügen neu berechnen
+  RecalcGesamtbetrag;
+
+  //Aufräumen
+  rbSchmuck.Checked := true;
+
+  ClearLabeledEdits(pnlUhr);
+  ClearLabeledEdits(pnlVerkaufsdaten);
+
+  cbZustand.ItemIndex := -1;
+  cbBox.Checked := false;
+  cbPapiere.Checked := false;
+  cbZustand.ItemIndex := -1;
+  cbEinheiten.ItemIndex := -1;
+
+  rbAddToInventarliste.Checked := false;
+  rbEdelmetallSammelverkauf.Checked := false;
+end;
+
+
+
+
+
+procedure TfAnkaufformular.btnAnkaufBeendenClick(Sender: TObject);
+var
+  i: integer;
+  item: TListItem;
+  TotalVersand, Versand, AktuellerPreis, TeuersterPreis: Int64;
+  TeuersterIdx: Integer;
+  HatInventar: Boolean;
+begin
+  if TrimEdit(edNachname) = '' then
+  begin
+    ShowMessage('Bitte geben Sie den Nachnamen des Verkäufers ein!');
+    edNachname.SetFocus;
+    Exit;
+  end;
+
+  if TrimEdit(edNachname) = '' then
+  begin
+    ShowMessage('Bitte geben Sie den Vornamen des Verkäufers ein!');
+    edNachname.SetFocus;
+    Exit;
+  end;
+
+  if(lvAnkaufartikel.Items.Count <= 0) then
+  begin
+    showmessage('Sie haben keine anzukaufenden Artikel eingegeben!');
+    PageControlArtikel.ActivePageIndex := 0;
+    exit;
+  end;
+
+{=======================
+  ZAHLUNGSART
+=======================}
+  if(cbZahlungsarten.ItemIndex < 0) then
+  begin
+    showmessage('Bitte wählen Sie eine Zahlungsart aus');
+    cbZahlungsarten.SetFocus;
+    exit;
+  end;
+
+{======================
+  Gesamtbetrag
+======================}
+  if (Trim(edGesamtbetrag.Text) <> '') and not IsValidDecimalString(edGesamtbetrag.Text) then
+  begin
+    ShowMessage('Ungültiger Gesamtbetrag! Bitte verwenden Sie das Format: 12,50');
+    edGesamtbetrag.SetFocus;
+    Exit;
+  end;
+
+
+{======================
+  ARTIKEL SPEICHERN
+======================}
+  TotalVersand := DecimalStringToInt100(edVersand.Text);
+
+  // Versandkosten dem hochpreisigsten Artikel zuweisen.
+  // Priorität: teuerster inventar-Artikel; gibt es keinen → teuerster edelmetall-Artikel.
+  HatInventar := false;
+
+  //Prüfen ob der Eintrag im Inventar erscheinen soll
+  for i := 0 to lvAnkaufartikel.Items.Count - 1 do
+  begin
+    if lvAnkaufartikel.Items[i].Caption = 'inventar' then
+    begin
+      HatInventar := true;
+      Break;
+    end;
+  end;
+
+  TeuersterIdx   := -1;
+  TeuersterPreis := -1;
+
+  //Alle Artikel in der Liste durchgehen
+  for i := 0 to lvAnkaufartikel.Items.Count - 1 do
+  begin
+    item := lvAnkaufartikel.Items[i];
+
+    if HatInventar and (item.Caption <> 'inventar') then
+      Continue;
+
+    if (not HatInventar) and (item.Caption <> 'edelmetall') then
+      Continue;
+
+    AktuellerPreis := DecimalStringToInt100(item.SubItems[6]);
+
+    if AktuellerPreis > TeuersterPreis then
+    begin
+      TeuersterPreis := AktuellerPreis;
+      TeuersterIdx   := i;
+    end;
+  end;
+
+  for i := 0 to lvAnkaufartikel.Items.Count - 1 do
+  begin
+    if i = TeuersterIdx then
+      Versand := TotalVersand
+    else
+      Versand := 0;
+
+    item := lvAnkaufartikel.Items[i];
+
+    if item.Caption = 'inventar' then
+    begin
+      InsertDataInInventar(item, Versand)
+    end
+    else if item.Caption = 'edelmetall' then
+    begin
+      InsertDataInAnkaufEdelmetall(item, Versand);
+    end;
+  end;
+
+  ShowMessage('Ankauf wurde erfolgreich gespeichert!');
+
+  // PDF-Formulare erzeugen
+  for i := 0 to lvAnkaufartikel.Items.Count - 1 do
+  begin
+    if lvAnkaufartikel.Items[i].Caption = 'edelmetall' then
+    begin
       CreateAnkaufsformularEdelmetalleAsPDF(PATHANKAUFSFORMULARE);
-    Close;
-    exit;
-  end;
-
-
-{=====================================
-  ANKAUFSDATEN - EDELMETALLANKAUF
-=====================================}
-  if(rbEdelmetallSammelverkauf.Checked) then
-  begin
-    edSKU.Text := GetLastSKUFromTable(fMain.FDConnection1, 'ankaufEdelmetall', 'EM');
-    InsertDataInAnkaufEdelmetall;
-    fMain.LoadInventarToListView;
-    CreateAnkaufsformularEdelmetalleAsPDF(PATHANKAUFSFORMULAREEDELMETALL);
-
-    fMain.AktualisiereAndShowStatistik;
-
-    Close;
-
-    exit;
-  end;
-end;
-
-
-
-
-//Neuen Kunden in Kundendaten speichern
-procedure TfAnkaufformular.InsertKundeInKundendaten;
-var
-  Q: TFDQuery;
-  TSGeburtsdatum: Int64;
-begin
-  //KundenNr
-  if TrimEdit(edKundenNr) = '' then
-  begin
-    ShowMessage('Bitte geben Sie eine KundenNr ein!');
-    edKundenNr.SetFocus;
-    Exit;
-  end;
-
-  // Kunde Geburtsdatum
-  if dtpGeburtsdatum.Checked then
-    TSGeburtsdatum := DateTimeToUnix(dtpGeburtsdatum.Date, False)
-  else
-    TSGeburtsdatum := 0;
-
-
-  Q := TFDQuery.Create(nil);
-  try
-    Q.Connection := fMain.FDConnection1;
-    fMain.FDConnection1.StartTransaction;
-    try
-      Q.SQL.Text := 'INSERT INTO kundendaten (kundenNr, Nachname, Vorname, StrasseHausNr, PLZ, Ort, Telefon, ' +
-                    'Handy, Email, AusweisNr, Geburtsdatum) ' +
-                    'VALUES (:KNR,:NACH,:VOR,:STR,:PLZ,:ORT,:TEL,:HANDY,:MAIL,:AUSW,:GEB)';
-
-      Q.ParamByName('KNR').AsString  := TrimEdit(edKundenNr);
-      Q.ParamByName('NACH').AsString := TrimEdit(edNachname);
-      Q.ParamByName('VOR').AsString  := TrimEdit(edVorname);
-      Q.ParamByName('STR').AsString  := TrimEdit(edStrasseHausNr);
-      Q.ParamByName('PLZ').AsString  := TrimEdit(edPLZ);
-      Q.ParamByName('ORT').AsString  := TrimEdit(edWohnort);
-      Q.ParamByName('TEL').AsString  := TrimEdit(edTelefon);
-      Q.ParamByName('HANDY').AsString:= TrimEdit(edHandy);
-      Q.ParamByName('MAIL').AsString := TrimEdit(edEmail);
-
-      if TrimEdit(edAusweisNr) = '' then
-      begin
-        Q.ParamByName('AUSW').DataType := ftString;
-        Q.ParamByName('AUSW').Clear;
-      end
-      else
-      begin
-        Q.ParamByName('AUSW').AsString := TrimEdit(edAusweisNr);
-      end;
-
-      Q.ParamByName('GEB').AsLargeInt := TSGeburtsdatum;
-      Q.ExecSQL;
-
-      Q.SQL.Text := 'SELECT last_insert_rowid()';
-      Q.Open;
-      KUNDENID := Q.Fields[0].AsInteger;
-      Q.Close;
-
-      fMain.FDConnection1.Commit;
-    except
-      fMain.FDConnection1.Rollback;
-      raise;
+      Break;
     end;
-  finally
-    Q.Free;
   end;
-end;
 
-
-
-
-
-//Änderungen an vorhandenem Kunden in Kundendaten speichern
-procedure TfAnkaufformular.UpdateKundeInKundendaten;
-var
-  Q: TFDQuery;
-  TSGeburtsdatum: Int64;
-begin
-  //KundenNr
-  if TrimEdit(edKundenNr) = '' then
+  for i := 0 to lvAnkaufartikel.Items.Count - 1 do
   begin
-    ShowMessage('Bitte geben Sie eine KundenNr ein!');
-    edKundenNr.SetFocus;
-    Exit;
-  end;
-
-  // Kunde Geburtsdatum
-  if dtpGeburtsdatum.Checked then
-    TSGeburtsdatum := DateTimeToUnix(dtpGeburtsdatum.Date, False)
-  else
-    TSGeburtsdatum := 0;
-
-
-  Q := TFDQuery.Create(nil);
-  try
-    Q.Connection := fMain.FDConnection1;
-    fMain.FDConnection1.StartTransaction;
-    try
-      Q.SQL.Text :=
-          'UPDATE kundendaten SET ' +
-          'kundenNr=:KNR, Nachname=:NACH, Vorname=:VOR, StrasseHausNr=:STR, ' +
-          'PLZ=:PLZ, Ort=:ORT, Telefon=:TEL, Handy=:HANDY, Email=:MAIL, ' +
-          'AusweisNr=:AUSW, Geburtsdatum=:GEB ' +
-          'WHERE id=:ID';
-
-        Q.ParamByName('ID').AsInteger   := KUNDENID;
-        Q.ParamByName('KNR').AsString   := TrimEdit(edKundenNr);
-        Q.ParamByName('NACH').AsString  := TrimEdit(edNachname);
-        Q.ParamByName('VOR').AsString   := TrimEdit(edVorname);
-        Q.ParamByName('STR').AsString   := TrimEdit(edStrasseHausNr);
-        Q.ParamByName('PLZ').AsString   := TrimEdit(edPLZ);
-        Q.ParamByName('ORT').AsString   := TrimEdit(edWohnort);
-        Q.ParamByName('TEL').AsString   := TrimEdit(edTelefon);
-        Q.ParamByName('HANDY').AsString := TrimEdit(edHandy);
-        Q.ParamByName('MAIL').AsString  := TrimEdit(edEmail);
-
-       if TrimEdit(edAusweisNr) = '' then
-        begin
-          Q.ParamByName('AUSW').DataType := ftString;
-          Q.ParamByName('AUSW').Clear;
-        end
-        else
-          Q.ParamByName('AUSW').AsString := TrimEdit(edAusweisNr);
-
-        Q.ParamByName('GEB').AsLargeInt := TSGeburtsdatum;
-        Q.ExecSQL;
-
-
-      //Zuletzt erzeugte ID ermitteln
-      Q.SQL.Text := 'SELECT last_insert_rowid()';
-      Q.Open;
-      Ankaufformular_LastID := Q.Fields[0].AsInteger;
-      Q.Close;
-
-      fMain.FDConnection1.Commit;
-    except
-      fMain.FDConnection1.Rollback;
-      raise;
+    if lvAnkaufartikel.Items[i].Caption = 'inventar' then
+    begin
+      CreateAnkaufsformularInventarAsPDF(PATHANKAUFSFORMULARE);
+      Break;
     end;
-  finally
-    Q.Free;
   end;
+
+  Close;
 end;
 
 
 
 
-procedure TfAnkaufformular.InsertDataInInventar;
+procedure TfAnkaufformular.btnKaufBeendenClick(Sender: TObject);
+begin
+  PageControlArtikel.ActivePageIndex := 1;
+end;
+
+
+
+
+
+
+procedure TfAnkaufformular.InsertDataInInventar(Item: TListItem; VersandAnteil: Int64);
 var
   Q: TFDQuery;
   Ankaufspreis, Versandpreis: Int64;
@@ -420,62 +451,38 @@ var
   SKU, Artikelname, Ref, Einheit, Marke, Model, Bemerkung, Zustand, Zahlungsart: string;
   GewichtInt: Integer;
 begin
-  // ===== Validierung SKU =====
-  SKU := TrimEdit(edSKU);
-  if SKU = '' then
-  begin
-    ShowMessage('Bitte geben Sie eine SKU ein!');
-    edSKU.SetFocus;
-    Exit;
-  end;
+  // ===== Werte aus ListView-Eintrag lesen =====
+  SKU          := Item.SubItems[0];
+  Artikelname  := Item.SubItems[1];
+  Bemerkung    := Item.SubItems[2];
+  Einheit      := Item.SubItems[3];
+  GewichtInt   := DecimalStringToInt100(Item.SubItems[4]);
+  Karat        := StrToIntDef(Item.SubItems[5], 0);
+  Ankaufspreis := DecimalStringToInt100(Item.SubItems[6]);
+  Marke        := Item.SubItems[7];
+  Model        := Item.SubItems[8];
+  Jahr         := StrToIntDef(Item.SubItems[9], 0);
+  Zustand      := Item.SubItems[10];
+  Ref          := Item.SubItems[11];
+  Box          := StrToIntDef(Item.SubItems[12], 0);
+  Papiere      := StrToIntDef(Item.SubItems[13], 0);
 
-  // ===== Validierung Ankaufspreis =====
-  if Trim(edAnkaufspreis.Text) = '' then
-  begin
-    ShowMessage('Bitte geben Sie den Ankaufspreis ein!');
-    edAnkaufspreis.SetFocus;
-    Exit;
-  end;
-
-  if not IsValidDecimalString(edAnkaufspreis.Text) then
-  begin
-    ShowMessage('Ungültiger Ankaufspreis! Bitte verwenden Sie das Format: 123,45');
-    edAnkaufspreis.SetFocus;
-    Exit;
-  end;
-
-  // ===== Validierung Versandpreis (falls angegeben) =====
-  if (Trim(edVersand.Text) <> '') and not IsValidDecimalString(edVersand.Text) then
-  begin
-    ShowMessage('Ungültiger Versandpreis! Bitte verwenden Sie das Format: 12,50');
-    edVersand.SetFocus;
-    Exit;
-  end;
-
-  // ===== Validierung Gewicht (falls angegeben) =====
-  if (Trim(edGewicht.Text) <> '') and not IsValidDecimalString(edGewicht.Text) then
-  begin
-    ShowMessage('Ungültiges Gewicht! Bitte verwenden Sie das Format: 45,67');
-    edGewicht.SetFocus;
-    Exit;
-  end;
-
-  // ===== UI-Werte mit Helper-Funktionen =====
-  Ref          := TrimEdit(edReferenz);
-  Ankaufspreis := DecimalStringToInt100(edAnkaufspreis.Text);
-  Artikelname  := TrimEdit(edArtikelname);
-  Bemerkung    := TrimEdit(edEinkaufBemerkung);
-  Einheit      := cbEinheiten.Text;
-  GewichtInt   := DecimalStringToInt100(edGewicht.Text);
-  Karat        := StrToIntDef(TrimEdit(edKarat), 0);
-  Box          := Ord(cbBox.Checked);
-  Papiere      := Ord(cbPapiere.Checked);
-  Marke        := TrimEdit(edMarke);
-  Model        := TrimEdit(edModel);
-  Jahr         := StrToIntDef(TrimEdit(edJahr), 0);
-  Zustand      := cbZustand.Text;
-  Versandpreis := DecimalStringToInt100(edVersand.Text);
+  // ===== Formular-Werte (gelten für alle Artikel der Sitzung) =====
+  Versandpreis := VersandAnteil;
   Zahlungsart  := cbZahlungsarten.Text;
+
+  if(Versandpreis <> 0) then
+  begin
+    Ankaufspreis := Ankaufspreis + Versandpreis;
+    if(Trim(Bemerkung) <> '') then
+    begin
+      Bemerkung := Bemerkung + ' enthält ' + Int100ToDecimalString(Versandpreis) + ' Euro Versandkosten';
+    end
+    else
+    begin
+      Bemerkung := 'enthält ' + Int100ToDecimalString(Versandpreis) + ' Euro Versandkosten';
+    end;
+  end;
 
   // ===== Datenbank =====
   Q := TFDQuery.Create(nil);
@@ -486,9 +493,9 @@ begin
       'INSERT INTO inventar ' +
       '(Einkaufsdatum, Artikelname, SKU, Einkaufswert, EinkaufBemerkung, Einheit, Gewicht, ' +
       'Karat, kundenID, Ref, Box, Papiere, Marke, Model, Jahr, Zustand, ' +
-      'Versand, Zahlungsart) ' +
+      'Versand, Zahlungsart, Nachname, Vorname, StrasseHausNr, PLZ, Ort, Telefon, Email) ' +
       'VALUES (:DAT, :ARTN, :SKU, :KP, :EKBEM, :EINH, :GEW, :KAR, :KD, :REF, :BOX, ' +
-      ':PAP, :MAR, :MOD, :JAHR, :ZUST, :VERS, :ZAHL)';
+      ':PAP, :MAR, :MOD, :JAHR, :ZUST, :VERS, :ZAHL, :NACH, :VOR, :STR, :PLZ, :ORT, :TEL, :MAIL)';
 
     fMain.FDConnection1.StartTransaction;
     try
@@ -512,6 +519,15 @@ begin
       Q.ParamByName('ZUST').AsString   := Zustand;
       Q.ParamByName('VERS').AsLargeInt := Versandpreis;
       Q.ParamByName('ZAHL').AsString   := Zahlungsart;
+
+      Q.ParamByName('NACH').AsString := TrimEdit(edNachname);
+      Q.ParamByName('VOR').AsString  := TrimEdit(edVorname);
+      Q.ParamByName('STR').AsString  := TrimEdit(edStrasseHausNr);
+      Q.ParamByName('PLZ').AsString  := TrimEdit(edPLZ);
+      Q.ParamByName('ORT').AsString  := TrimEdit(edWohnort);
+      Q.ParamByName('TEL').AsString  := TrimEdit(edTelefon);
+      Q.ParamByName('MAIL').AsString := TrimEdit(edEmail);
+
 
       Q.ExecSQL;
 
@@ -537,79 +553,42 @@ end;
 
 
 
-procedure TfAnkaufformular.InsertDataInAnkaufEdelmetall;
+procedure TfAnkaufformular.InsertDataInAnkaufEdelmetall(Item: TListItem; VersandAnteil: Int64);
 var
   Q: TFDQuery;
   Ankaufspreis, Versandpreis, Gesamtpreis: Int64;
   Karat, Gewicht: Integer;
   SKU, Ref, Artikelname, Bemerkung, Zahlungsart, Einheit: string;
 begin
-  // ===== Validierung SKU =====
-  SKU := TrimEdit(edSKU);
-  if SKU = '' then
-  begin
-    ShowMessage('Bitte geben Sie eine SKU ein!');
-    edSKU.SetFocus;
-    Exit;
-  end;
+  // ===== Werte aus ListView-Eintrag lesen =====
+  SKU          := Item.SubItems[0];
+  Artikelname  := Item.SubItems[1];
+  Bemerkung    := Item.SubItems[2];
+  Einheit      := Item.SubItems[3];
+  Gewicht      := DecimalStringToInt100(Item.SubItems[4]);
+  Karat        := StrToIntDef(Item.SubItems[5], 0);
+  Ankaufspreis := DecimalStringToInt100(Item.SubItems[6]);
+  Ref          := Item.SubItems[11];
 
-  // ===== Validierung Ankaufspreis =====
-  if Trim(edAnkaufspreis.Text) = '' then
-  begin
-    ShowMessage('Bitte geben Sie den Ankaufspreis ein!');
-    edAnkaufspreis.SetFocus;
-    Exit;
-  end;
-
-  if not IsValidDecimalString(edAnkaufspreis.Text) then
-  begin
-    ShowMessage('Ungültiger Ankaufspreis! Bitte verwenden Sie das Format: 123,45');
-    edAnkaufspreis.SetFocus;
-    Exit;
-  end;
-
-  // ===== Validierung Versandpreis (falls angegeben) =====
-  if (Trim(edVersand.Text) <> '') and not IsValidDecimalString(edVersand.Text) then
-  begin
-    ShowMessage('Ungültiger Versandpreis! Bitte verwenden Sie das Format: 12,50');
-    edVersand.SetFocus;
-    Exit;
-  end;
-
-  // ===== Validierung Gesamtpreis (falls angegeben) =====
-  if (Trim(edGesamtbetrag.Text) <> '') and not IsValidDecimalString(edGesamtbetrag.Text) then
-  begin
-    ShowMessage('Ungültiger Gesamtpreis! Bitte verwenden Sie das Format: 135,95');
-    edGesamtbetrag.SetFocus;
-    Exit;
-  end;
-
-  // ===== Validierung Gewicht (falls angegeben) =====
-  if (TrimEdit(edGewicht) <> '') and not IsValidDecimalString(edGewicht.Text) then
-  begin
-    ShowMessage('Ungültiges Gewicht! Bitte verwenden Sie das Format: 45,67');
-    edGewicht.SetFocus;
-    Exit;
-  end;
-
-  // ===== Validierung Karat =====
-  if not TryStrToInt(TrimEdit(edKarat), Karat) then
-  begin
-    ShowMessage('Ungültiger Karat-Wert! Bitte geben Sie eine Zahl ein.');
-    edKarat.SetFocus;
-    Exit;
-  end;
-
-  // ===== UI-Werte mit Helper-Funktionen =====
-  Ankaufspreis := DecimalStringToInt100(edAnkaufspreis.Text);
-  Artikelname  := TrimEdit(edArtikelname);
-  Bemerkung    := TrimEdit(edEinkaufBemerkung);
-  Einheit      := cbEinheiten.Text;
-  Gewicht      := DecimalStringToInt100(edGewicht.Text);
-  Ref          := TrimEdit(edReferenz);
-  Versandpreis := DecimalStringToInt100(edVersand.Text);
+  // ===== Formular-Werte (gelten für alle Artikel der Sitzung) =====
+  Versandpreis := VersandAnteil;
   Zahlungsart  := cbZahlungsarten.Text;
-  Gesamtpreis  := DecimalStringToInt100(edGesamtbetrag.Text);
+  // Gesamtpreis = Artikelpreis + anteiliger Versand dieses Eintrags
+  Gesamtpreis  := Ankaufspreis + VersandAnteil;
+
+
+  if(Versandpreis <> 0) then
+  begin
+    Ankaufspreis := Ankaufspreis + Versandpreis;
+    if(Trim(Bemerkung) <> '') then
+    begin
+      Bemerkung := Bemerkung + ' enthält ' + Int100ToDecimalString(Versandpreis) + ' Euro Versandkosten';
+    end
+    else
+    begin
+      Bemerkung := 'enthält ' + Int100ToDecimalString(Versandpreis) + ' Euro Versandkosten';
+    end;
+  end;
 
   // ===== Datenbank =====
   Q := TFDQuery.Create(nil);
@@ -618,13 +597,12 @@ begin
 
     Q.SQL.Text :=
       'INSERT INTO ankaufEdelmetall ' +
-      '(kundenID, SKU, Ref, Ankaufsdatum, Ankaufswert, Artikelname, AnkaufBemerkung, Einheit, ' +
-      'Karat, Gewicht, Zahlungsart, Versand, Gesamtpreis) ' +
-      'VALUES (:KDID, :SKU, :REF, :DAT, :KP, :ARTN, :BEM, :EINH, :KAR, :GEW, :ZAHL, :VERS, :GES)';
+      '(SKU, Ref, Ankaufsdatum, Ankaufswert, Artikelname, AnkaufBemerkung, Einheit, ' +
+      'Karat, Gewicht, Zahlungsart, Versand, Gesamtpreis, Nachname, Vorname, StrasseHausNr, PLZ, Ort, Telefon, Email) ' +
+      'VALUES (:SKU, :REF, :DAT, :KP, :ARTN, :BEM, :EINH, :KAR, :GEW, :ZAHL, :VERS, :GES, :NACH, :VOR, :STR, :PLZ, :ORT, :TEL, :MAIL)';
 
     fMain.FDConnection1.StartTransaction;
     try
-      Q.ParamByName('KDID').AsInteger  := KUNDENID;
       Q.ParamByName('SKU').AsString    := SKU;
       Q.ParamByName('REF').AsString    := Ref;
 
@@ -634,12 +612,20 @@ begin
       Q.ParamByName('KP').AsLargeInt   := Ankaufspreis;
       Q.ParamByName('ARTN').AsString   := Artikelname;
       Q.ParamByName('BEM').AsString    := Bemerkung;
-      Q.ParamByName('EINH').AsString   := cbEinheiten.Text;
+      Q.ParamByName('EINH').AsString   := Einheit;
       Q.ParamByName('KAR').AsInteger   := Karat;
       Q.ParamByName('GEW').AsInteger   := Gewicht;
       Q.ParamByName('ZAHL').AsString   := Zahlungsart;
       Q.ParamByName('VERS').AsLargeInt := Versandpreis;
       Q.ParamByName('GES').AsLargeInt  := Gesamtpreis;
+
+      Q.ParamByName('NACH').AsString := TrimEdit(edNachname);
+      Q.ParamByName('VOR').AsString  := TrimEdit(edVorname);
+      Q.ParamByName('STR').AsString  := TrimEdit(edStrasseHausNr);
+      Q.ParamByName('PLZ').AsString  := TrimEdit(edPLZ);
+      Q.ParamByName('ORT').AsString  := TrimEdit(edWohnort);
+      Q.ParamByName('TEL').AsString  := TrimEdit(edTelefon);
+      Q.ParamByName('MAIL').AsString := TrimEdit(edEmail);
 
       Q.ExecSQL;
 
@@ -854,30 +840,32 @@ var
   ankaufsnr, ankaufdatum: string;
 
   s, kaufbetrag, versandbetrag, gesamtbetrag, artikel: string;
-  artikelname, bemerkung, gewicht, karat, zahlungsart, ref, sku, kurzbezeichnung: string;
+  artikelname, bemerkung, gewicht, karat, zahlungsart, sku, kurzbezeichnung: string;
 begin
-  //kundennr := trim(edKundenNr.Text);
-  nachname := trim(edNachname.Text);
-  vorname := trim(edVorname.Text);
-  strassehausnr := trim(edStrasseHausNr.Text);
-  plz := trim(edPLZ.Text);
-  ort := trim(edWohnort.Text);
-  ankaufsnr := IntToStr(Ankaufformular_LastID);
-  ankaufdatum := trim(DateToStr(dtpAnkaufsdatum.Date));
-
-  artikel := trim(edArtikelname.Text);
-  bemerkung := trim(edEinkaufBemerkung.Text);
-  gewicht := trim(edGewicht.Text);
-  karat := trim(edKarat.Text);
-  versandbetrag := trim(edVersand.Text);
-  if(versandbetrag = '') then versandbetrag := '0,00';
-  gesamtbetrag := trim(edGesamtbetrag.Text);
+  nachname        := trim(edNachname.Text);
+  vorname         := trim(edVorname.Text);
+  strassehausnr   := trim(edStrasseHausNr.Text);
+  plz             := trim(edPLZ.Text);
+  ort             := trim(edWohnort.Text);
+  ankaufsnr       := IntToStr(Ankaufformular_LastID);
+  ankaufdatum     := trim(DateToStr(dtpAnkaufsdatum.Date));
+  gesamtbetrag    := trim(edGesamtbetrag.Text);
   kurzbezeichnung := 'Kurzbezeichnung';
-  zahlungsart := trim(cbZahlungsarten.Text);
-  sku := trim(edSKU.Text);
+  zahlungsart     := trim(cbZahlungsarten.Text);
+  versandbetrag   := trim(edVersand.Text);
+  if(versandbetrag = '') then versandbetrag := '0,00';
 
-  ref := trim(edReferenz.Text);
-  kaufbetrag := edAnkaufspreis.Text;
+  // Erste SKU aus den Edelmetall-Einträgen der ListView ermitteln
+  sku := '';
+  for i := 0 to lvAnkaufartikel.Items.Count - 1 do
+  begin
+    if (lvAnkaufartikel.Items[i].Caption = 'edelmetall') and
+       (lvAnkaufartikel.Items[i].SubItems.Count > 0) then
+    begin
+      sku := lvAnkaufartikel.Items[i].SubItems[0];
+      Break;
+    end;
+  end;
 
 
 //Hier nur das was einmal für alle Seiten geladen werden muss (HtmlHeader, HtmlFooter)
@@ -918,20 +906,29 @@ begin
 //HEADER ENDE
 
 
-//CONTENT START
-    resContent := TResourceStream.Create(HInstance, 'ANKAUFSFORMULAR_CONTENT', 'TXT');
-    stlContent := TStringList.Create;
-    try
-      stlContent.LoadFromStream(resContent);
-      stlContent.Text := StringReplace(stlContent.Text, '#REF', ref, [rfReplaceAll]);
-      stlContent.Text := StringReplace(stlContent.Text, '#ARTIKEL', artikel, [rfReplaceAll]);
-      stlContent.Text := StringReplace(stlContent.Text, '#GEWICHT', gewicht, [rfReplaceAll]);
-      stlContent.Text := StringReplace(stlContent.Text, '#KARAT', karat, [rfReplaceAll]);
-      stlContent.Text := StringReplace(stlContent.Text, '#KAUFPREIS', kaufbetrag, [rfReplaceAll]);
-      stltemp.Add(stlContent.Text);
-    finally
-      resContent.Free;
-      stlContent.Free;
+//CONTENT START - Einmal für jeden Edelmetall-Artikel ausführen
+    for i := 0 to lvAnkaufartikel.Items.Count - 1 do
+    begin
+      if lvAnkaufartikel.Items[i].Caption <> 'edelmetall' then Continue;
+
+      artikel    := lvAnkaufartikel.Items[i].SubItems[1];
+      gewicht    := lvAnkaufartikel.Items[i].SubItems[4];
+      karat      := lvAnkaufartikel.Items[i].SubItems[5];
+      kaufbetrag := lvAnkaufartikel.Items[i].SubItems[6];
+
+      resContent := TResourceStream.Create(HInstance, 'ANKAUFSFORMULAR_CONTENT', 'TXT');
+      stlContent := TStringList.Create;
+      try
+        stlContent.LoadFromStream(resContent);
+        stlContent.Text := StringReplace(stlContent.Text, '#ARTIKEL', artikel, [rfReplaceAll]);
+        stlContent.Text := StringReplace(stlContent.Text, '#GEWICHT', gewicht, [rfReplaceAll]);
+        stlContent.Text := StringReplace(stlContent.Text, '#KARAT', karat, [rfReplaceAll]);
+        stlContent.Text := StringReplace(stlContent.Text, '#KAUFPREIS', kaufbetrag, [rfReplaceAll]);
+        stltemp.Add(stlContent.Text);
+      finally
+        resContent.Free;
+        stlContent.Free;
+      end;
     end;
 //CONTENT ENDE
 
@@ -1009,6 +1006,192 @@ end;
 
 
 
+procedure TfAnkaufformular.CreateAnkaufsformularInventarAsPDF(const Pfad: string);
+var
+  stltemp: TStringList;
+  i: integer;
+  filename, filenameTemp: string;
+  stlHtmlHeader, stlHtmlFooter, stlContent: TStringList;
+  resHtmlHeader, resHtmlFooter, resContent: TResourceStream;
+
+  nachname, vorname, strassehausnr, plz, ort: string;
+  ankaufsnr, ankaufdatum: string;
+
+  s, kaufbetrag, versandbetrag, gesamtbetrag, artikel: string;
+  bemerkung, gewicht, karat, zahlungsart, sku, kurzbezeichnung: string;
+  marke, model, jahr, zustand, ref, einheit, box, papiere: string;
+begin
+  nachname        := trim(edNachname.Text);
+  vorname         := trim(edVorname.Text);
+  strassehausnr   := trim(edStrasseHausNr.Text);
+  plz             := trim(edPLZ.Text);
+  ort             := trim(edWohnort.Text);
+  ankaufsnr       := IntToStr(Ankaufformular_LastID);
+  ankaufdatum     := trim(DateToStr(dtpAnkaufsdatum.Date));
+  gesamtbetrag    := trim(edGesamtbetrag.Text);
+  kurzbezeichnung := 'Kurzbezeichnung';
+  zahlungsart     := trim(cbZahlungsarten.Text);
+  versandbetrag   := trim(edVersand.Text);
+  if(versandbetrag = '') then versandbetrag := '0,00';
+
+  // Erste SKU aus den Inventar-Einträgen der ListView ermitteln
+  sku := '';
+  for i := 0 to lvAnkaufartikel.Items.Count - 1 do
+  begin
+    if (lvAnkaufartikel.Items[i].Caption = 'inventar') and
+       (lvAnkaufartikel.Items[i].SubItems.Count > 0) then
+    begin
+      sku := lvAnkaufartikel.Items[i].SubItems[0];
+      Break;
+    end;
+  end;
+
+
+//Hier nur das was einmal für alle Seiten geladen werden muss (HtmlHeader, HtmlFooter)
+  stlTemp := nil;
+  try
+    stlTemp := TStringList.Create;
+
+//HEADER START
+    resHtmlHeader := TResourceStream.Create(HInstance, 'ANKAUFSFORMULAR_HEADER_INVENTAR', 'TXT');
+    stlHtmlHeader := TStringList.Create;
+    try
+      stlHtmlHeader.LoadFromStream(resHtmlHeader);
+
+      stlHtmlHeader.Text := StringReplace(stlHtmlHeader.Text, '#KUNDEVORNAME', vorname, [rfReplaceAll]);
+      stlHtmlHeader.Text := StringReplace(stlHtmlHeader.Text, '#KUNDENACHNAME', nachname, [rfReplaceAll]);
+      stlHtmlHeader.Text := StringReplace(stlHtmlHeader.Text, '#KUNDESTRASSEHAUSNR', strassehausnr, [rfReplaceAll]);
+      stlHtmlHeader.Text := StringReplace(stlHtmlHeader.Text, '#KUNDEPLZ', plz, [rfReplaceAll]);
+      stlHtmlHeader.Text := StringReplace(stlHtmlHeader.Text, '#KUNDENORT', ort, [rfReplaceAll]);
+
+      s := FIRMENNAME + ' - ' + FIRMASTRASSE + ', ' + FIRMAORT;
+
+      stlHtmlHeader.Text := StringReplace(stlHtmlHeader.Text, '#BRIEFFENSTERFIRMENDATEN', s, [rfReplaceAll]);
+
+      stlHtmlHeader.Text := StringReplace(stlHtmlHeader.Text, '#INHABERNAME', FIRMENINHABER, [rfReplaceAll]);
+      stlHtmlHeader.Text := StringReplace(stlHtmlHeader.Text, '#FIRMENNAME', FIRMENNAME, [rfReplaceAll]);
+      stlHtmlHeader.Text := StringReplace(stlHtmlHeader.Text, '#FIRMASTRASSEHAUSNR', FIRMASTRASSE, [rfReplaceAll]);
+      stlHtmlHeader.Text := StringReplace(stlHtmlHeader.Text, '#FIRMAPLZ', FIRMAPLZ, [rfReplaceAll]);
+      stlHtmlHeader.Text := StringReplace(stlHtmlHeader.Text, '#FIRMAORT', FIRMAORT, [rfReplaceAll]);
+
+      stlHtmlHeader.Text := StringReplace(stlHtmlHeader.Text, '#ANKAUFSNUMMER', IntToStr(ExtractNumber(sku)), [rfReplaceAll]);
+      stlHtmlHeader.Text := StringReplace(stlHtmlHeader.Text, '#ANKAUFDATUM', ankaufdatum, [rfReplaceAll]);
+
+      stltemp.Add(stlHtmlHeader.Text);
+    finally
+      stlHtmlHeader.Free;
+      resHtmlHeader.Free;
+    end;
+//HEADER ENDE
+
+
+//CONTENT START - Einmal für jeden Inventar-Artikel ausführen
+    for i := 0 to lvAnkaufartikel.Items.Count - 1 do
+    begin
+      if lvAnkaufartikel.Items[i].Caption <> 'inventar' then Continue;
+
+      // SubItems: [0]=SKU [1]=Artikelname [2]=Bemerkung [3]=Einheit [4]=Gewicht
+      //           [5]=Karat [6]=Ankaufpreis [7]=Marke [8]=Model [9]=Jahr
+      //           [10]=Zustand [11]=Ref [12]=Box [13]=Papiere
+      artikel    := lvAnkaufartikel.Items[i].SubItems[1];
+      bemerkung  := lvAnkaufartikel.Items[i].SubItems[2];
+      einheit    := lvAnkaufartikel.Items[i].SubItems[3];
+      gewicht    := lvAnkaufartikel.Items[i].SubItems[4];
+      karat      := lvAnkaufartikel.Items[i].SubItems[5];
+      kaufbetrag := lvAnkaufartikel.Items[i].SubItems[6];
+      marke      := lvAnkaufartikel.Items[i].SubItems[7];
+      model      := lvAnkaufartikel.Items[i].SubItems[8];
+      jahr       := lvAnkaufartikel.Items[i].SubItems[9];
+      zustand    := lvAnkaufartikel.Items[i].SubItems[10];
+      ref        := lvAnkaufartikel.Items[i].SubItems[11];
+      if lvAnkaufartikel.Items[i].SubItems[12] = '1' then box := 'X' else box := '-';
+      if lvAnkaufartikel.Items[i].SubItems[13] = '1' then papiere := 'X' else papiere := '-';
+
+      if(Trim(marke) <> '') then
+        if(Trim(model) <> '') then
+          s := marke + ' / ' + model
+        else
+          s := marke
+      else
+        s := '';
+
+      resContent := TResourceStream.Create(HInstance, 'ANKAUFSFORMULAR_CONTENT_INVENTAR', 'TXT');
+      stlContent := TStringList.Create;
+      try
+        stlContent.LoadFromStream(resContent);
+        stlContent.Text := StringReplace(stlContent.Text, '#ARTIKEL', artikel, [rfReplaceAll]);
+        stlContent.Text := StringReplace(stlContent.Text, '#GEWICHT', gewicht, [rfReplaceAll]);
+        stlContent.Text := StringReplace(stlContent.Text, '#KARAT', karat, [rfReplaceAll]);
+        stlContent.Text := StringReplace(stlContent.Text, '#KAUFPREIS', kaufbetrag, [rfReplaceAll]);
+        stlContent.Text := StringReplace(stlContent.Text, '#MARKEMODEL', s, [rfReplaceAll]);
+        stlContent.Text := StringReplace(stlContent.Text, '#ZUSTAND', zustand, [rfReplaceAll]);
+        stlContent.Text := StringReplace(stlContent.Text, '#BOX', box, [rfReplaceAll]);
+        stlContent.Text := StringReplace(stlContent.Text, '#PAPIERE', papiere, [rfReplaceAll]);
+        stlContent.Text := StringReplace(stlContent.Text, '#REF', ref, [rfReplaceAll]);
+        stlContent.Text := StringReplace(stlContent.Text, '#EINHEIT', einheit, [rfReplaceAll]);
+        stltemp.Add(stlContent.Text);
+      finally
+        resContent.Free;
+        stlContent.Free;
+      end;
+    end;
+//CONTENT ENDE
+
+
+//FOOTER START
+    resHtmlFooter := TResourceStream.Create(HInstance, 'ANKAUFSFORMULAR_FOOTER_INVENTAR', 'TXT');
+    stlHtmlFooter := TStringList.Create;
+    try
+      stlHtmlFooter.LoadFromStream(resHtmlFooter);
+
+      stlHtmlFooter.Text := StringReplace(stlHtmlFooter.Text, '#VERSANDBETRAG', versandbetrag, [rfReplaceAll]);
+      stlHtmlFooter.Text := StringReplace(stlHtmlFooter.Text, '#GESAMTBETRAG', gesamtbetrag, [rfReplaceAll]);
+      stlHtmlFooter.Text := StringReplace(stlHtmlFooter.Text, '#ZAHLUNGSART', zahlungsart, [rfReplaceAll]);
+      stlHtmlFooter.Text := StringReplace(stlHtmlFooter.Text, '#SKU', sku, [rfReplaceAll]);
+      stlHtmlFooter.Text := StringReplace(stlHtmlFooter.Text, '#INHABERNAME', FIRMENINHABER, [rfReplaceAll]);
+      stlHtmlFooter.Text := StringReplace(stlHtmlFooter.Text, '#FIRMAUSTID', FIRMAUMSATZSTEUERID, [rfReplaceAll]);
+      stlHtmlFooter.Text := StringReplace(stlHtmlFooter.Text, '#FIRMAIBAN', FIRMAIBAN, [rfReplaceAll]);
+
+      stltemp.Add(stlHtmlFooter.Text);
+    finally
+      stlHtmlFooter.Free;
+      resHtmlFooter.Free;
+    end;
+//FOOTER ENDE
+
+
+  //Alle Umlaute in der StringList ersetzen durch html code
+    for i := 0 to stlTemp.Count - 1 do
+    begin
+      stlTemp[i] := ReplaceUmlauteWithHtmlEntities(stlTemp[i]);
+    end;
+
+
+    filenameTemp := 'Ankaufsformular_Inventar';
+
+    if(Ankaufformular_LastID > 0) then
+      filenameTemp := filenameTemp + '_' + IntToStr(ExtractNumber(sku));
+
+    //Dateiname für zu speichernde Datei erzeugen
+    if(trim(edNachname.Text) <> '') then
+      if(Trim(edVorname.Text) <> '') then
+        filenameTemp := filenameTemp + '_' + trim(edNachname.Text) + '_' + trim(edVorname.Text)
+      else
+        filenameTemp := filenameTemp + '_' + trim(edNachname.Text);
+
+    filename := filenameTemp;
+
+    //Erzeugte Datei speichern
+    CreateHtmlAndPdfFileFromResource(TPath.Combine(Pfad, filename), stlTemp);
+
+  finally
+    stlTemp.Free;
+  end;
+end;
+
+
+
+
 procedure TfAnkaufformular.cbZahlungsartenSelect(Sender: TObject);
 var
   i: integer;
@@ -1033,25 +1216,6 @@ begin
     SELZUSTAND := Integer(cbZustand.Items.Objects[i]);
   end;
 end;
-
-
-
-
-procedure TfAnkaufformular.edAnkaufspreisChange(Sender: TObject);
-var
-  Kaufpreis, Versand, Gesamt: Double;
-begin
-  // Werte aus den Edit-Feldern auslesen
-  Kaufpreis := StrToFloatDef(Trim(edAnkaufspreis.Text), 0);
-  Versand   := StrToFloatDef(Trim(edVersand.Text), 0);
-
-  // Summe berechnen
-  Gesamt := Kaufpreis + Versand;
-
-  // Ergebnis anzeigen
-  edGesamtbetrag.Text := FormatFloat('0.00', Gesamt);
-end;
-
 
 
 
@@ -1120,18 +1284,6 @@ begin
     Edit.SelectAll;
   end;
 end;
-
-
-procedure TfAnkaufformular.edKundensucheKeyPress(Sender: TObject; var Key: Char);
-begin
-  if Key = #13 then
-  begin
-    Key := #0;
-    btnKundensucheClick(nil);
-  end;
-end;
-
-
 
 
 procedure TfAnkaufformular.edNachnameKeyUp(Sender: TObject; var Key: Word; Shift: TShiftState);
@@ -1209,15 +1361,12 @@ end;
 
 
 procedure TfAnkaufformular.FormShow(Sender: TObject);
-var
-  s: string;
-  i: integer;
 begin
-  KUNDENDATENEDITED := false;
-  NEUERKUNDE := true;
-  KUNDENID := 0;
-
   Ankaufformular_LastID := 0;
+
+  PageControlArtikel.ActivePageIndex := 0;
+
+  lvAnkaufArtikel.Items.Clear;
 
   LoadZustaendeFromDB(fMain.FDConnection1, cbZustand);
   LoadZahlungsartenFromDB(fMain.FDConnection1, cbZahlungsarten);
@@ -1225,10 +1374,6 @@ begin
 
   //Kundenformular
   ClearLabeledEdits(Panel4);
-
-
-  dtpGeburtsdatum.Date := StrToDate('01.01.1970');
-  dtpGeburtsdatum.Checked := false;
 
 
   //Ankaufsformular
@@ -1246,160 +1391,20 @@ begin
   dtpAnkaufsdatum.Date := now;
   dtpAnkaufsdatum.Checked := true;
 
-  edKundenNr.Text := GetNextKdNr(fMain.FDConnection1);
+  // edVersand.OnExit per Code zuweisen (keine DFM-Änderung nötig)
+  edVersand.OnExit := edVersandExit;
+
+  edArtikelname.SetFocus;
 end;
 
 
 
 
 
-
-
-procedure TfAnkaufformular.LoadKundendatenBySuchbegriff(
-  const AConnection: TFDConnection; const Suchbegriff: string);
-var
-  Q: TFDQuery;
-  sDatum: string;
-  DT: TDateTime;
-  FS: TFormatSettings;
-  IsDatum: Boolean;
-  s: string;
-  i: Integer;
+procedure TfAnkaufformular.rbAddToInventarlisteClick(Sender: TObject);
 begin
-  // Standard FormatSettings für yyyy-mm-dd
-  FS := TFormatSettings.Create;
-  FS.DateSeparator := '-';
-  FS.ShortDateFormat := 'yyyy-mm-dd';
-
-  // --- Leerer Suchbegriff ---
-  if Trim(Suchbegriff) = '' then
-  begin
-    KUNDENID := 0;
-    NEUERKUNDE := True;
-
-    s := GetNextKdNr(fMain.FDConnection1);
-    for i := 0 to Panel4.ControlCount - 1 do
-      if Panel4.Controls[i] is TLabeledEdit then
-        TLabeledEdit(Panel4.Controls[i]).Text := '';
-
-    if Trim(s) = '' then
-      edKundenNr.Text := STARTKDNR_ANKAUF
-    else
-      edKundenNr.Text := Trim(s);
-
-    Exit;
-  end;
-
-  // --- Prüfen, ob Suchbegriff ein Datum ist ---
-  IsDatum := TryStrToDate(Suchbegriff, DT, FS);
-
-  Q := TFDQuery.Create(nil);
-  try
-    Q.Connection := AConnection;
-
-    // --- SQL-Abfrage ---
-    Q.SQL.Text :=
-      'SELECT id, kundenNr, Nachname, Vorname, StrasseHausNr, PLZ, Ort, ' +
-      'Telefon, Handy, Email, AusweisNr, Geburtsdatum ' +
-      'FROM kundendaten ' +
-      'WHERE UPPER(kundenNr) = UPPER(:SUCH) OR ' +
-            'UPPER(Nachname) = UPPER(:SUCH) OR ' +
-            'UPPER(AusweisNr) = UPPER(:SUCH)';
-
-    if IsDatum then
-      Q.SQL.Text := Q.SQL.Text + ' OR Geburtsdatum = :GEBURT';
-
-    Q.ParamByName('SUCH').AsString := Trim(Suchbegriff);
-
-    if IsDatum then
-      Q.ParamByName('GEBURT').AsString := FormatDateTime('yyyy-mm-dd', DT, FS);
-
-    Q.Open;
-
-    // --- Keine Treffer ---
-    if Q.RecordCount = 0 then
-    begin
-      ShowMessage('Es wurde kein Kunde anhand Ihres Suchbegriffs gefunden.');
-      NEUERKUNDE := True;
-      KUNDENID := 0;
-
-      dtpGeburtsdatum.Checked := False;
-
-      edKundenNr.Text := GetNextKdNr(fMain.FDConnection1);
-      edNachname.Clear;
-      edVorname.Clear;
-      edStrasseHausNr.Clear;
-      edPLZ.Clear;
-      edWohnort.Clear;
-      edTelefon.Clear;
-      edHandy.Clear;
-      edEmail.Clear;
-      edAusweisNr.Clear;
-      dtpGeburtsdatum.Date := StrToDate('01.01.1970');
-      dtpGeburtsdatum.Checked := False;
-
-      //sbNextKdNr.Visible := True;
-      Exit;
-    end
-    else
-      NEUERKUNDE := False;
-
-    // --- Mehrere Treffer ---
-    if Q.RecordCount > 1 then
-    begin
-      KUNDENID := 0;
-      ShowMessage(
-        'Mehrere Kunden entsprechen diesem Suchbegriff.' + sLineBreak +
-        'Bitte präzisieren (z. B. KundenNr oder AusweisNr).'
-      );
-      //sbNextKdNr.Visible := False;
-      Exit;
-    end;
-
-    // --- Genau ein Treffer ---
-    Q.First;
-
-    KUNDENID := Q.FieldByName('id').AsInteger;
-    KUNDENNR := Q.FieldByName('kundenNr').AsString;
-
-    edKundenNr.Text      := Q.FieldByName('kundenNr').AsString;
-    edNachname.Text      := Q.FieldByName('Nachname').AsString;
-    edVorname.Text       := Q.FieldByName('Vorname').AsString;
-    edStrasseHausNr.Text := Q.FieldByName('StrasseHausNr').AsString;
-    edPLZ.Text           := Q.FieldByName('PLZ').AsString;
-    edWohnort.Text       := Q.FieldByName('Ort').AsString;
-    edTelefon.Text       := Q.FieldByName('Telefon').AsString;
-    edHandy.Text         := Q.FieldByName('Handy').AsString;
-    edEmail.Text         := Q.FieldByName('Email').AsString;
-    edAusweisNr.Text     := Q.FieldByName('AusweisNr').AsString;
-
-    //sbNextKdNr.Visible := False;
-
-    // --- Geburtsdatum konvertieren ---
-    sDatum := Q.FieldByName('Geburtsdatum').AsString; // z.B. '2026-02-09'
-    if sDatum <> '' then
-    begin
-      if TryStrToDate(sDatum, DT, FS) then
-      begin
-        dtpGeburtsdatum.Date := DT;
-        dtpGeburtsdatum.Checked := True;
-      end
-      else
-        dtpGeburtsdatum.Checked := False; // ungültiges Datum
-    end
-    else
-      dtpGeburtsdatum.Checked := False;   // NULL oder leer
-
-  finally
-    Q.Free;
-  end;
+  edArtikelname.SetFocus;
 end;
-
-
-
-
-
-
 
 procedure TfAnkaufformular.rbSchmuckClick(Sender: TObject);
 begin
@@ -1407,10 +1412,12 @@ begin
   begin
     pnlUhr.Visible := false;
     rbAddToInventarliste.Checked := false;
+    edArtikelname.SetFocus;
   end
   else
   begin
     pnlUhr.Visible := true;
+    edMarke.SetFocus;
   end;
 end;
 
@@ -1420,28 +1427,14 @@ begin
   begin
     pnlUhr.Visible := true;
     rbAddToInventarliste.Checked := true;
+    edMarke.SetFocus;
   end
   else
   begin
     pnlUhr.Visible := false;
+    edArtikelname.SetFocus;
   end;
 end;
-
-procedure TfAnkaufformular.sbNextKdNrClick(Sender: TObject);
-var
-  s: string;
-begin
-  s := GetNextKdNr(fMain.FDConnection1);
-  if(trim(s) = '') then
-    edKundenNr.Text := STARTKDNR_ANKAUF
-  else
-    edKundenNr.Text := trim(s);
-end;
-
-
-
-
-
 
 procedure TfAnkaufformular.sbNextSKUClick(Sender: TObject);
 var
@@ -1456,6 +1449,36 @@ begin
 
 
 
+
+// Summe aller Ankaufspreise aus der ListView + Versand -> edGesamtbetrag
+procedure TfAnkaufformular.RecalcGesamtbetrag;
+var
+  i: Integer;
+  TotalAnkauf, Versand, Gesamt: Int64;
+begin
+  TotalAnkauf := 0;
+  for i := 0 to lvAnkaufartikel.Items.Count - 1 do
+  begin
+    if lvAnkaufartikel.Items[i].SubItems.Count > 6 then
+      TotalAnkauf := TotalAnkauf + DecimalStringToInt100(lvAnkaufartikel.Items[i].SubItems[6]);
+  end;
+
+  if IsValidDecimalString(edVersand.Text) then
+    Versand := DecimalStringToInt100(edVersand.Text)
+  else
+    Versand := 0;
+
+  Gesamt := TotalAnkauf + Versand;
+  edGesamtbetrag.Text := Int100ToDecimalString(Gesamt);
+end;
+
+
+
+
+procedure TfAnkaufformular.edVersandExit(Sender: TObject);
+begin
+  RecalcGesamtbetrag;
+end;
 
 
 

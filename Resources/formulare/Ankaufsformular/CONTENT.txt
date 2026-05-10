@@ -1,6 +1,0 @@
-        <tr>
-          <td style="padding: 10px;">#ARTIKEL</td>
-          <td style="padding: 10px; text-align: center;">#GEWICHT g</td>
-	  <td style="padding: 10px; text-align: center;">#KARAT Karat</td>
-          <td style="padding: 10px; text-align: right;">#KAUFPREIS €</td>
-        </tr>

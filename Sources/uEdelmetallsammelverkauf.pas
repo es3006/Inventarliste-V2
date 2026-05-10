@@ -80,26 +80,12 @@ begin
     try
       Q.Connection := fMain.FDConnection1;
       Q.SQL.Text :=
-        'SELECT ' +
-        'a.id, ' +
-        'k.Nachname || '', '' || k.Vorname || '' ('' || k.KundenNr || '')'' AS Kundenname, ' +
-        'a.SKU, ' +
-        'a.Ref, ' +
-        'a.Ankaufsdatum, ' +
-        'a.Ankaufswert, ' +
-        'a.Artikelname, ' +
-        'a.AnkaufBemerkung, ' +
-        'a.Einheit, ' +
-        'a.Karat, ' +
-        'a.Gewicht, ' +
-        'a.Zahlungsart, ' +
-        'a.Versand, ' +
-        'a.Gesamtpreis, ' +
+        'SELECT id, SKU, Ankaufsdatum, Ankaufswert, Artikelname, AnkaufBemerkung, Einheit, ' +
+        'Karat, Gewicht, Zahlungsart, Versand, Gesamtpreis, Nachname || '', '' || Vorname AS Kundenname, ' +
         '(SELECT SUM(Gesamtpreis) FROM ankaufEdelmetall WHERE id IN (' + IDList + ')) AS SummeGesamt ' +
-        'FROM ankaufEdelmetall a ' +
-        'LEFT JOIN kundendaten k ON k.id = a.kundenID ' +
-        'WHERE a.id IN (' + IDList + ') ' +
-        'ORDER BY a.Ankaufsdatum DESC';
+        'FROM ankaufEdelmetall ' +
+        'WHERE id IN (' + IDList + ') ' +
+        'ORDER BY Ankaufsdatum DESC';
 
       Q.Open;
 
@@ -114,9 +100,7 @@ begin
       begin
         Item := lvEdelmetallEinkaeufe.Items.Add;
         Item.Caption := Q.FieldByName('id').AsString;
-
         Item.SubItems.Add(Q.FieldByName('SKU').AsString);
-        Item.SubItems.Add(Q.FieldByName('Ref').AsString);
         Item.SubItems.Add(Q.FieldByName('Kundenname').AsString);
         Item.SubItems.Add(SQLiteDateToDisplay(Q.FieldByName('Ankaufsdatum').AsString));
         Item.SubItems.Add(Q.FieldByName('Artikelname').AsString);

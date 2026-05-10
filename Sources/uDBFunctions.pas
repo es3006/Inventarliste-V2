@@ -262,7 +262,14 @@ begin
         'Jahr INTEGER NOT NULL DEFAULT 0, ' +
         'Zustand TEXT, ' +
         'Versand INTEGER, ' +
-        'Zahlungsart TEXT)'
+        'Zahlungsart TEXT, ' +
+        'Nachname TEXT, ' +
+        'Vorname TEXT, ' +
+        'StrasseHausNr TEXT, ' +
+        'PLZ TEXT, ' +
+        'Ort TEXT, ' +
+        'Telefon TEXT, ' +
+        'Email TEXT)'
       );
 
 
@@ -287,6 +294,13 @@ begin
         'Versand INTEGER NOT NULL DEFAULT 0, ' +
         'Gesamtpreis INTEGER NOT NULL DEFAULT 0, ' +
         'verkaufID INTEGER NULL, ' +
+        'Nachname TEXT, ' +
+        'Vorname TEXT, ' +
+        'StrasseHausNr TEXT, ' +
+        'PLZ TEXT, ' +
+        'Ort TEXT, ' +
+        'Telefon TEXT, ' +
+        'Email TEXT, ' +
         'FOREIGN KEY (verkaufID) REFERENCES verkaufEdelmetall(id) ON DELETE SET NULL)'
       );
 
@@ -340,6 +354,31 @@ begin
   try
     Q.Connection := Connection;
 
+
+    //ankaufEdelmetall
+    if not ColumnExists(Connection, 'ankaufEdelmetall', 'Nachname') then
+      Q.ExecSQL('ALTER TABLE ankaufEdelmetall ADD COLUMN Nachname TEXT');
+
+    if not ColumnExists(Connection, 'ankaufEdelmetall', 'Vorname') then
+      Q.ExecSQL('ALTER TABLE ankaufEdelmetall ADD COLUMN Vorname TEXT');
+
+    if not ColumnExists(Connection, 'ankaufEdelmetall', 'StrasseHausNr') then
+      Q.ExecSQL('ALTER TABLE ankaufEdelmetall ADD COLUMN StrasseHausNr TEXT');
+
+    if not ColumnExists(Connection, 'ankaufEdelmetall', 'PLZ') then
+      Q.ExecSQL('ALTER TABLE ankaufEdelmetall ADD COLUMN PLZ TEXT');
+
+    if not ColumnExists(Connection, 'ankaufEdelmetall', 'Ort') then
+      Q.ExecSQL('ALTER TABLE ankaufEdelmetall ADD COLUMN Ort TEXT');
+
+    if not ColumnExists(Connection, 'ankaufEdelmetall', 'Telefon') then
+      Q.ExecSQL('ALTER TABLE ankaufEdelmetall ADD COLUMN Telefon TEXT');
+
+    if not ColumnExists(Connection, 'ankaufEdelmetall', 'Email') then
+      Q.ExecSQL('ALTER TABLE ankaufEdelmetall ADD COLUMN Email TEXT');
+
+
+    //inventar
     if not ColumnExists(Connection, 'inventar', 'AnkaufformularID') then
       Q.ExecSQL('ALTER TABLE inventar ADD COLUMN AnkaufformularID INTEGER NOT NULL DEFAULT 0');
 
@@ -378,6 +417,27 @@ begin
 
     if not ColumnExists(Connection, 'inventar', 'Zahlungsart') then
       Q.ExecSQL('ALTER TABLE inventar ADD COLUMN Zahlungsart TEXT');
+
+    if not ColumnExists(Connection, 'inventar', 'Nachname') then
+      Q.ExecSQL('ALTER TABLE inventar ADD COLUMN Nachname TEXT');
+
+    if not ColumnExists(Connection, 'inventar', 'Vorname') then
+      Q.ExecSQL('ALTER TABLE inventar ADD COLUMN Vorname TEXT');
+
+    if not ColumnExists(Connection, 'inventar', 'StrasseHausNr') then
+      Q.ExecSQL('ALTER TABLE inventar ADD COLUMN StrasseHausNr TEXT');
+
+    if not ColumnExists(Connection, 'inventar', 'PLZ') then
+      Q.ExecSQL('ALTER TABLE inventar ADD COLUMN PLZ TEXT');
+
+    if not ColumnExists(Connection, 'inventar', 'Ort') then
+      Q.ExecSQL('ALTER TABLE inventar ADD COLUMN Ort TEXT');
+
+    if not ColumnExists(Connection, 'inventar', 'Telefon') then
+      Q.ExecSQL('ALTER TABLE inventar ADD COLUMN Telefon TEXT');
+
+    if not ColumnExists(Connection, 'inventar', 'Email') then
+      Q.ExecSQL('ALTER TABLE inventar ADD COLUMN Email TEXT');
   finally
     Q.Free;
   end;

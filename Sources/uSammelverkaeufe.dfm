@@ -28,8 +28,6 @@ object fSammelverkaeufe: TfSammelverkaeufe
     Font.Style = [fsBold]
     ParentFont = False
     TabOrder = 0
-    ExplicitLeft = -273
-    ExplicitWidth = 897
   end
   object Panel2: TPanel
     Left = 0
@@ -39,9 +37,6 @@ object fSammelverkaeufe: TfSammelverkaeufe
     Align = alTop
     ShowCaption = False
     TabOrder = 1
-    ExplicitLeft = -273
-    ExplicitTop = 41
-    ExplicitWidth = 897
     object Label4: TLabel
       Left = 8
       Top = 12
@@ -68,11 +63,6 @@ object fSammelverkaeufe: TfSammelverkaeufe
         MaxWidth = 1
         Tag = 1
         Width = 0
-      end
-      item
-        Alignment = taCenter
-        Caption = 'KundenNr'
-        Width = 70
       end
       item
         Caption = 'Nachname'
@@ -165,7 +155,7 @@ object fSammelverkaeufe: TfSammelverkaeufe
     DetailView.Font.Name = 'Segoe UI'
     DetailView.Font.Style = []
     Version = '1.9.1.1'
-    ExplicitWidth = 624
+    ExplicitHeight = 282
   end
   object Panel3: TPanel
     Left = 0
@@ -175,7 +165,6 @@ object fSammelverkaeufe: TfSammelverkaeufe
     Align = alTop
     ShowCaption = False
     TabOrder = 3
-    ExplicitWidth = 624
     object Label1: TLabel
       Left = 24
       Top = 16

@@ -44,6 +44,9 @@ function IsAllowedColumn(const Col: string): Boolean;
 procedure ExportListViewToCSV(LV: TListView; const Filename: string;
   const ColumnOrder: array of Integer; const ColumnHeaders: array of string;
   const Separator: Char = ';');
+procedure ExportListViewToXLSX(LV: TListView; const Filename: string;
+  const ColumnOrder: array of Integer;
+  const ColumnHeaders: array of string);
 procedure OpenCalculator;
 function ExcelEuroToCent(const V: Variant): Int64;
 procedure lvColumnClickForSort(Sender: TObject; Column: TListColumn);
@@ -637,6 +640,105 @@ begin
       ShowMessage('Beim Export der Inventarliste ist wohl was schief gelaufen!');
   end;
 end;
+
+
+
+
+procedure ExportListViewToXLSX(LV: TListView;
+  const Filename: string;
+  const ColumnOrder: array of Integer;
+  const ColumnHeaders: array of string);
+var
+  XF: TXlsFile;
+  FmtHeader: TFlxFormat;
+  HeaderFmtIdx: Integer;
+  Row, Col: Integer;
+  i, j: Integer;
+  Item: TListItem;
+  Value: string;
+  ini: TIniFile;
+  ColCount: Integer;
+begin
+  if Length(ColumnOrder) <> Length(ColumnHeaders) then
+  begin
+    ShowMessage('ColumnOrder und ColumnHeaders müssen gleich lang sein!');
+    Exit;
+  end;
+
+  ColCount := Length(ColumnHeaders);
+  XF := TXlsFile.Create(1, TExcelFileFormat.v2019, True);
+  try
+    // Tabellenblatt umbenennen
+    //XF.SetSheetName(1, 'Inventar');
+
+    // Header-Format: fett + grauer Hintergrund
+    //FmtHeader := XF.GetDefaultFormat;
+    //FmtHeader.Font.Style := TFlxFontStyle.Bold;
+    //FmtHeader.FillPattern.Pattern := TFlxPatternStyle.Solid;
+    //FmtHeader.FillPattern.FgColor := TExcelColor.FromArgb($D9, $D9, $D9);
+    //FmtHeader.Borders.Bottom.Style := TFlxBorderStyle.Thin;
+    //HeaderFmtIdx := XF.AddFormat(FmtHeader);
+
+    // Kopfzeile schreiben (Zeile 1)
+    Row := 1;
+    for j := 0 to High(ColumnHeaders) do
+    begin
+      Col := j + 1;
+      XF.SetCellValue(Row, Col, ColumnHeaders[j]);
+      XF.SetCellFormat(Row, Col, HeaderFmtIdx);
+    end;
+
+    // Datenzeilen schreiben
+    for i := 0 to LV.Items.Count - 1 do
+    begin
+      Item := LV.Items[i];
+      Row := i + 2;
+      for j := 0 to High(ColumnOrder) do
+      begin
+        Col := j + 1;
+        if ColumnOrder[j] = -1 then
+          Value := Item.Caption
+        else if ColumnOrder[j] < Item.SubItems.Count then
+          Value := Item.SubItems[ColumnOrder[j]]
+        else
+          Value := '';
+        if Value <> '' then
+          XF.SetCellValue(Row, Col, Value);
+      end;
+    end;
+
+    // Spaltenbreiten setzen
+    for j := 1 to ColCount do
+      XF.SetColWidth(j, j, 5000);
+
+    // AutoFilter auf Kopfzeile: row1, col1, row2, col2
+    XF.SetAutoFilter(1, 1, 1, ColCount);
+
+    XF.Save(Filename);
+
+    ini := TIniFile.Create(PATH + 'settings.ini');
+    try
+      ini.WriteInteger('DATENEXPORT', 'LastExport', Trunc(Now));
+      fMain.LoadStatusBarValues;
+    finally
+      ini.Free;
+    end;
+
+    if FileExists(Filename) then
+      ShowMessage('Inventarliste wurde erfolgreich exportiert!')
+    else
+      ShowMessage('Beim Export der Inventarliste ist wohl was schief gelaufen!');
+
+  finally
+    XF.Free;
+  end;
+end;
+
+
+
+
+
+
 
 procedure OpenCalculator;
 begin

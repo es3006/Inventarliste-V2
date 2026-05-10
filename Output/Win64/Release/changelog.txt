@@ -1,3 +1,9 @@
+
+10.05.2026
+- Die Inventarliste kann jetzt als CSV oder als Excekdatei 
+  exportiert werden.
+
+
 03.03.2026
 - Das Fenster "Preisabfrage" wird jetzt auf Bildschirmen mit 
   unterschiedlichen Skalierungen korrekt dargestellt auch wenn 

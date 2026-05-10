@@ -3,8 +3,8 @@ object fAnkaufformular: TfAnkaufformular
   Top = 0
   BorderIcons = [biSystemMenu, biMinimize]
   Caption = 'Ankaufsformular'
-  ClientHeight = 473
-  ClientWidth = 742
+  ClientHeight = 501
+  ClientWidth = 753
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -23,225 +23,131 @@ object fAnkaufformular: TfAnkaufformular
     Left = 0
     Top = 0
     Width = 357
-    Height = 473
+    Height = 501
     Align = alLeft
     Color = 14548957
     ParentBackground = False
     ShowCaption = False
     TabOrder = 0
-    ExplicitHeight = 528
-    object Label8: TLabel
-      Left = 196
-      Top = 411
-      Width = 76
-      Height = 15
-      Caption = 'Geburtsdatum'
-    end
-    object sbNextKdNr: TSpeedButton
-      Left = 106
-      Top = 102
-      Width = 31
-      Height = 22
-      Cursor = crHandPoint
-      Caption = 'Akt'
-      Visible = False
-      OnClick = sbNextKdNrClick
-    end
-    object edKundenNr: TLabeledEdit
-      Left = 18
-      Top = 101
-      Width = 92
-      Height = 23
-      EditLabel.Width = 57
-      EditLabel.Height = 15
-      EditLabel.Caption = 'KundenNr'
-      EditLabel.Font.Charset = DEFAULT_CHARSET
-      EditLabel.Font.Color = clWindowText
-      EditLabel.Font.Height = -12
-      EditLabel.Font.Name = 'Segoe UI'
-      EditLabel.Font.Style = [fsBold]
-      EditLabel.ParentFont = False
-      Enabled = False
-      ReadOnly = True
-      TabOrder = 1
-      Text = ''
+    object Label5: TLabel
+      Left = 10
+      Top = 26
+      Width = 82
+      Height = 17
+      Caption = 'Kundendaten'
+      Font.Charset = DEFAULT_CHARSET
+      Font.Color = clWindowText
+      Font.Height = -13
+      Font.Name = 'Segoe UI'
+      Font.Style = [fsBold]
+      ParentFont = False
     end
     object edVorname: TLabeledEdit
-      Left = 180
-      Top = 166
+      Left = 172
+      Top = 96
       Width = 150
       Height = 23
-      EditLabel.Width = 47
+      EditLabel.Width = 50
       EditLabel.Height = 15
       EditLabel.Caption = 'Vorname'
       EditLabel.Font.Charset = DEFAULT_CHARSET
       EditLabel.Font.Color = clWindowText
       EditLabel.Font.Height = -12
       EditLabel.Font.Name = 'Segoe UI'
-      EditLabel.Font.Style = []
+      EditLabel.Font.Style = [fsBold]
       EditLabel.ParentFont = False
-      TabOrder = 3
+      TabOrder = 1
       Text = ''
       OnKeyUp = edNachnameKeyUp
     end
     object edNachname: TLabeledEdit
-      Left = 18
-      Top = 166
+      Left = 10
+      Top = 96
       Width = 150
       Height = 23
-      EditLabel.Width = 58
+      EditLabel.Width = 59
       EditLabel.Height = 15
       EditLabel.Caption = 'Nachname'
       EditLabel.Font.Charset = ANSI_CHARSET
       EditLabel.Font.Color = clWindowText
       EditLabel.Font.Height = -12
       EditLabel.Font.Name = 'Segoe UI'
-      EditLabel.Font.Style = []
+      EditLabel.Font.Style = [fsBold]
       EditLabel.ParentFont = False
-      TabOrder = 2
+      TabOrder = 0
       Text = ''
       OnKeyUp = edNachnameKeyUp
     end
     object edStrasseHausNr: TLabeledEdit
-      Left = 18
-      Top = 232
+      Left = 10
+      Top = 162
       Width = 150
       Height = 23
       EditLabel.Width = 82
       EditLabel.Height = 15
       EditLabel.Caption = 'Strasse, HausNr'
-      TabOrder = 4
+      TabOrder = 2
       Text = ''
       OnKeyUp = edNachnameKeyUp
     end
     object edPLZ: TLabeledEdit
-      Left = 18
-      Top = 282
+      Left = 10
+      Top = 212
       Width = 57
       Height = 23
       EditLabel.Width = 20
       EditLabel.Height = 15
       EditLabel.Caption = 'PLZ'
       MaxLength = 6
-      TabOrder = 5
+      TabOrder = 3
       Text = ''
       OnKeyPress = edPLZKeyPress
       OnKeyUp = edNachnameKeyUp
     end
     object edWohnort: TLabeledEdit
-      Left = 87
-      Top = 282
+      Left = 79
+      Top = 212
       Width = 243
       Height = 23
       EditLabel.Width = 47
       EditLabel.Height = 15
       EditLabel.Caption = 'Wohnort'
-      TabOrder = 6
+      TabOrder = 4
       Text = ''
       OnKeyUp = edNachnameKeyUp
     end
     object edTelefon: TLabeledEdit
-      Left = 18
-      Top = 332
+      Left = 10
+      Top = 262
       Width = 150
       Height = 23
       EditLabel.Width = 38
       EditLabel.Height = 15
       EditLabel.Caption = 'Telefon'
-      TabOrder = 7
-      Text = ''
-      OnKeyPress = edTelefonKeyPress
-      OnKeyUp = edNachnameKeyUp
-    end
-    object edHandy: TLabeledEdit
-      Left = 180
-      Top = 332
-      Width = 150
-      Height = 23
-      EditLabel.Width = 35
-      EditLabel.Height = 15
-      EditLabel.Caption = 'Handy'
-      TabOrder = 8
+      TabOrder = 5
       Text = ''
       OnKeyPress = edTelefonKeyPress
       OnKeyUp = edNachnameKeyUp
     end
     object edEmail: TLabeledEdit
-      Left = 18
-      Top = 382
-      Width = 177
+      Left = 10
+      Top = 312
+      Width = 312
       Height = 23
       EditLabel.Width = 29
       EditLabel.Height = 15
       EditLabel.Caption = 'Email'
-      TabOrder = 9
+      TabOrder = 6
       Text = ''
       OnKeyUp = edNachnameKeyUp
-    end
-    object edAusweisnr: TLabeledEdit
-      Left = 18
-      Top = 432
-      Width = 177
-      Height = 23
-      EditLabel.Width = 54
-      EditLabel.Height = 15
-      EditLabel.Caption = 'Ausweisnr'
-      TabOrder = 10
-      Text = ''
-      OnKeyUp = edNachnameKeyUp
-    end
-    object dtpGeburtsdatum: TDateTimePicker
-      Left = 212
-      Top = 432
-      Width = 118
-      Height = 23
-      Date = 46025.000000000000000000
-      Time = 0.918865486113645600
-      ShowCheckbox = True
-      TabOrder = 11
-      OnKeyUp = edNachnameKeyUp
-    end
-    object Panel1: TPanel
-      Left = 1
-      Top = 1
-      Width = 355
-      Height = 60
-      Align = alTop
-      Color = 16773593
-      ParentBackground = False
-      ShowCaption = False
-      TabOrder = 0
-      object edKundensuche: TLabeledEdit
-        Left = 18
-        Top = 26
-        Width = 225
-        Height = 23
-        EditLabel.Width = 263
-        EditLabel.Height = 15
-        EditLabel.Caption = 'Kundensuche (KundenNr, Nachname, AusweisNr)'
-        ParentShowHint = False
-        ShowHint = False
-        TabOrder = 0
-        Text = ''
-        OnKeyPress = edKundensucheKeyPress
-      end
-      object btnKundensuche: TButton
-        Left = 254
-        Top = 24
-        Width = 75
-        Height = 25
-        Caption = 'Suchen'
-        TabOrder = 1
-        OnClick = btnKundensucheClick
-      end
     end
   end
-  object AdvPageControl2: TAdvPageControl
+  object PageControlArtikel: TAdvPageControl
     Left = 357
     Top = 0
-    Width = 385
-    Height = 473
-    ActivePage = AdvTabSheet2
+    Width = 396
+    Height = 501
+    ActivePage = AdvTabSheet3
     ActiveFont.Charset = DEFAULT_CHARSET
     ActiveFont.Color = clWindowText
     ActiveFont.Height = -11
@@ -262,28 +168,20 @@ object fAnkaufformular: TfAnkaufformular
       ColorTo = clNone
       TabColor = clBtnFace
       TabColorTo = clNone
-      ExplicitLeft = 24
-      ExplicitTop = 0
-      ExplicitWidth = 100
-      ExplicitHeight = 100
       object Panel3: TPanel
         Left = 0
         Top = 0
-        Width = 377
-        Height = 443
+        Width = 388
+        Height = 471
         Align = alClient
         AutoSize = True
         BevelOuter = bvNone
         ShowCaption = False
         TabOrder = 0
-        ExplicitLeft = -8
-        ExplicitTop = -33
-        ExplicitWidth = 620
-        ExplicitHeight = 511
         object pnlUhr: TPanel
           Left = 0
           Top = 57
-          Width = 377
+          Width = 388
           Height = 100
           Align = alTop
           BevelOuter = bvNone
@@ -291,7 +189,6 @@ object fAnkaufformular: TfAnkaufformular
           ParentBackground = False
           TabOrder = 1
           Visible = False
-          ExplicitWidth = 383
           object Label9: TLabel
             Left = 18
             Top = 49
@@ -302,7 +199,7 @@ object fAnkaufformular: TfAnkaufformular
           object Bevel1: TBevel
             Left = 0
             Top = 90
-            Width = 377
+            Width = 388
             Height = 10
             Align = alBottom
             Shape = bsBottomLine
@@ -323,7 +220,7 @@ object fAnkaufformular: TfAnkaufformular
           object edModel: TLabeledEdit
             Left = 155
             Top = 22
-            Width = 128
+            Width = 158
             Height = 23
             EditLabel.Width = 34
             EditLabel.Height = 15
@@ -332,7 +229,7 @@ object fAnkaufformular: TfAnkaufformular
             Text = ''
           end
           object edJahr: TLabeledEdit
-            Left = 289
+            Left = 319
             Top = 22
             Width = 56
             Height = 23
@@ -345,20 +242,20 @@ object fAnkaufformular: TfAnkaufformular
             Text = ''
           end
           object cbBox: TCheckBox
-            Left = 155
+            Left = 247
             Top = 72
             Width = 48
             Height = 17
             Caption = 'Box'
-            TabOrder = 4
+            TabOrder = 5
           end
           object cbPapiere: TCheckBox
-            Left = 207
+            Left = 299
             Top = 72
             Width = 65
             Height = 17
             Caption = 'Papiere'
-            TabOrder = 5
+            TabOrder = 6
           end
           object cbZustand: TComboBox
             Left = 18
@@ -369,17 +266,27 @@ object fAnkaufformular: TfAnkaufformular
             TabOrder = 3
             OnSelect = cbZustandSelect
           end
+          object edReferenz: TLabeledEdit
+            Left = 153
+            Top = 69
+            Width = 88
+            Height = 23
+            EditLabel.Width = 45
+            EditLabel.Height = 15
+            EditLabel.Caption = 'Referenz'
+            MaxLength = 10
+            TabOrder = 4
+            Text = ''
+          end
         end
         object pnlVerkaufsdaten: TPanel
           Left = 0
           Top = 157
-          Width = 377
-          Height = 200
+          Width = 388
+          Height = 208
           Align = alTop
           BevelOuter = bvNone
           TabOrder = 2
-          ExplicitTop = 229
-          ExplicitWidth = 624
           object Label3: TLabel
             Left = 18
             Top = 109
@@ -418,9 +325,15 @@ object fAnkaufformular: TfAnkaufformular
             Top = 26
             Width = 327
             Height = 23
-            EditLabel.Width = 158
+            EditLabel.Width = 168
             EditLabel.Height = 15
             EditLabel.Caption = 'Artikelname (max 50 Zeichen)'
+            EditLabel.Font.Charset = DEFAULT_CHARSET
+            EditLabel.Font.Color = clWindowText
+            EditLabel.Font.Height = -12
+            EditLabel.Font.Name = 'Segoe UI'
+            EditLabel.Font.Style = [fsBold]
+            EditLabel.ParentFont = False
             MaxLength = 50
             TabOrder = 0
             Text = ''
@@ -442,7 +355,6 @@ object fAnkaufformular: TfAnkaufformular
             MaxLength = 10
             TabOrder = 5
             Text = ''
-            OnChange = edAnkaufspreisChange
             OnExit = edGewichtExit
             OnKeyPress = edAnkaufspreisKeyPress
           end
@@ -469,17 +381,16 @@ object fAnkaufformular: TfAnkaufformular
         object pnlVerkaufDefault: TPanel
           Left = 0
           Top = 0
-          Width = 377
+          Width = 388
           Height = 57
           Align = alTop
           BevelOuter = bvNone
           ShowCaption = False
           TabOrder = 0
-          ExplicitWidth = 383
           object Bevel3: TBevel
             Left = 0
             Top = 47
-            Width = 377
+            Width = 388
             Height = 10
             Align = alBottom
             Shape = bsBottomLine
@@ -517,20 +428,38 @@ object fAnkaufformular: TfAnkaufformular
         end
         object btnAddNewItem: TButton
           Left = 18
-          Top = 406
+          Top = 430
           Width = 167
           Height = 25
           Caption = 'Weiteren Artikel ankaufen'
           TabOrder = 3
+          OnClick = btnAddNewItemClick
         end
         object btnKaufBeenden: TButton
-          Left = 216
-          Top = 406
+          Left = 240
+          Top = 430
           Width = 129
           Height = 25
           Caption = 'Kauf beenden'
           TabOrder = 4
           OnClick = btnKaufBeendenClick
+        end
+        object rbEdelmetallSammelverkauf: TRadioButton
+          Left = 18
+          Top = 394
+          Width = 246
+          Height = 17
+          Caption = 'F'#252'r Edelmetall-Sammelverkauf markieren'
+          TabOrder = 5
+        end
+        object rbAddToInventarliste: TRadioButton
+          Left = 18
+          Top = 371
+          Width = 199
+          Height = 17
+          Caption = 'In Inventarliste aufnehmen'
+          TabOrder = 6
+          OnClick = rbAddToInventarlisteClick
         end
       end
     end
@@ -540,16 +469,18 @@ object fAnkaufformular: TfAnkaufformular
       ColorTo = clNone
       TabColor = clBtnFace
       TabColorTo = clNone
-      ExplicitLeft = 5
-      ExplicitTop = 27
-      ExplicitWidth = 383
-      ExplicitHeight = 497
       object Label10: TLabel
         Left = 19
         Top = 287
-        Width = 63
+        Width = 65
         Height = 15
         Caption = 'Zahlungsart'
+        Font.Charset = DEFAULT_CHARSET
+        Font.Color = clWindowText
+        Font.Height = -12
+        Font.Name = 'Segoe UI'
+        Font.Style = [fsBold]
+        ParentFont = False
       end
       object sbNextSKU: TSpeedButton
         Left = 206
@@ -601,47 +532,84 @@ object fAnkaufformular: TfAnkaufformular
         EditLabel.Caption = 'Versand (EUR)'
         TabOrder = 1
         Text = ''
-        OnChange = edAnkaufspreisChange
         OnExit = edGewichtExit
         OnKeyPress = edAnkaufspreisKeyPress
       end
       object edGesamtbetrag: TLabeledEdit
         Left = 231
         Top = 306
-        Width = 130
+        Width = 146
         Height = 23
-        EditLabel.Width = 106
+        EditLabel.Width = 114
         EditLabel.Height = 15
         EditLabel.Caption = 'Gesamtbetrag (EUR)'
+        EditLabel.Font.Charset = DEFAULT_CHARSET
+        EditLabel.Font.Color = clWindowText
+        EditLabel.Font.Height = -12
+        EditLabel.Font.Name = 'Segoe UI'
+        EditLabel.Font.Style = [fsBold]
+        EditLabel.ParentFont = False
         MaxLength = 10
         TabOrder = 2
         Text = ''
         OnExit = edGewichtExit
         OnKeyPress = edAnkaufspreisKeyPress
       end
-      object rbAddToInventarliste: TRadioButton
-        Left = 15
-        Top = 339
-        Width = 199
-        Height = 17
-        Caption = 'In Inventarliste aufnehmen'
-        TabOrder = 3
-      end
-      object rbEdelmetallSammelverkauf: TRadioButton
-        Left = 15
-        Top = 362
-        Width = 246
-        Height = 17
-        Caption = 'F'#252'r Edelmetall-Sammelverkauf markieren'
-        TabOrder = 4
-      end
-      object AdvListView1: TAdvListView
+      object lvAnkaufartikel: TAdvListView
         Left = 15
         Top = 35
-        Width = 346
-        Height = 194
-        Columns = <>
-        TabOrder = 5
+        Width = 362
+        Height = 246
+        Columns = <
+          item
+            Caption = 'Art'
+          end
+          item
+            Caption = 'SKU'
+          end
+          item
+            Caption = 'Artikelname'
+          end
+          item
+            Caption = 'EinkaufBemerkung'
+          end
+          item
+            Caption = 'Einheit'
+          end
+          item
+            Caption = 'Gewicht'
+          end
+          item
+            Caption = 'Karat'
+          end
+          item
+            Caption = 'Ankaufpreis'
+          end
+          item
+            Caption = 'UhrMarke'
+          end
+          item
+            Caption = 'UhrModel'
+          end
+          item
+            Caption = 'UhrJahr'
+          end
+          item
+            Caption = 'UhrZustand'
+          end
+          item
+            Caption = 'UhrReferenz'
+          end
+          item
+            Caption = 'UhrBox'
+          end
+          item
+            Caption = 'UhrPapiere'
+          end>
+        ReadOnly = True
+        RowSelect = True
+        TabOrder = 3
+        ViewStyle = vsReport
         FilterTimeOut = 0
         PrintSettings.DateFormat = 'dd/mm/yyyy'
         PrintSettings.Font.Charset = DEFAULT_CHARSET
@@ -673,27 +641,6 @@ object fAnkaufformular: TfAnkaufformular
         DetailView.Font.Style = []
         Version = '1.9.1.1'
       end
-      object btnSaveAnkauf: TButton
-        Left = 15
-        Top = 405
-        Width = 346
-        Height = 25
-        Caption = 'Kauf abschlie'#223'en'
-        TabOrder = 6
-        OnClick = btnSaveAnkaufClick
-      end
-      object edReferenz: TLabeledEdit
-        Left = 15
-        Top = 256
-        Width = 88
-        Height = 23
-        EditLabel.Width = 45
-        EditLabel.Height = 15
-        EditLabel.Caption = 'Referenz'
-        MaxLength = 10
-        TabOrder = 7
-        Text = ''
-      end
       object edSKU: TLabeledEdit
         Left = 121
         Top = 256
@@ -709,7 +656,7 @@ object fAnkaufformular: TfAnkaufformular
         EditLabel.Font.Name = 'Segoe UI'
         EditLabel.Font.Style = [fsBold]
         EditLabel.ParentFont = False
-        TabOrder = 8
+        TabOrder = 4
         Text = ''
         TextHint = 'AK'
         Visible = False
@@ -722,8 +669,17 @@ object fAnkaufformular: TfAnkaufformular
         Date = 46025.000000000000000000
         Time = 0.918865486113645600
         ShowCheckbox = True
-        TabOrder = 9
+        TabOrder = 5
         Visible = False
+      end
+      object btnAnkaufBeenden: TButton
+        Left = 15
+        Top = 405
+        Width = 362
+        Height = 25
+        Caption = 'Kauf abschlie'#223'en'
+        TabOrder = 6
+        OnClick = btnAnkaufBeendenClick
       end
     end
   end

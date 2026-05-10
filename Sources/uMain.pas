@@ -87,7 +87,6 @@ type
     mZahlungsarten: TMenuItem;
     mZustaende: TMenuItem;
     Kunden1: TMenuItem;
-    Kundendaten1: TMenuItem;
     mAnkaeufe: TMenuItem;
     Ankaufsformular1: TMenuItem;
     acEditKundenankauf: TAction;
@@ -125,6 +124,8 @@ type
     Label2: TLabel;
     pnlPreisabfrage: TPanel;
     lbPreisabfrage: TLabel;
+    InventarlistealsExcelDateiexportieren1: TMenuItem;
+    acExportAsExcel: TAction;
     procedure FormCreate(Sender: TObject);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure FormDestroy(Sender: TObject);
@@ -170,7 +171,6 @@ type
     procedure lbAnkaufsformularMouseLeave(Sender: TObject);
     procedure mZustaendeClick(Sender: TObject);
     procedure mZahlungsartenClick(Sender: TObject);
-    procedure Kundendaten1Click(Sender: TObject);
     procedure mAnkaeufeClick(Sender: TObject);
     procedure Ankaufsformular1Click(Sender: TObject);
     procedure acEditKundenankaufUpdate(Sender: TObject);
@@ -192,6 +192,12 @@ type
     procedure lbPreisabfrageMouseEnter(Sender: TObject);
     procedure lbPreisabfrageMouseLeave(Sender: TObject);
     procedure lbPreisabfrageClick(Sender: TObject);
+    procedure lvEdelmetallInfoTip(Sender: TObject; Item: TListItem;
+      var InfoTip: string);
+    procedure lvEdelmetallSelectItem(Sender: TObject; Item: TListItem;
+      Selected: Boolean);
+    procedure acExportAsExcelExecute(Sender: TObject);
+    procedure acExportAsExcelUpdate(Sender: TObject);
   private
     FIsLoading: Boolean;
     FInitComplete: Boolean;
@@ -631,6 +637,41 @@ end;
 
 
 
+
+procedure TfMain.acExportAsExcelExecute(Sender: TObject);
+var
+  monatsnr: string;
+begin
+  if (SelMonth < 10) then
+    monatsnr := '0' + IntToStr(SelMonth)
+  else
+    monatsnr := IntToStr(SelMonth);
+  ExportListViewToXLSX(lvInventar,
+    //PATHDOKUMENTE + '\' + monatsnr + '_' + IntToStr(SelYear) + '.xlsx',
+    PATHDOKUMENTE + '\Inventarliste.xlsx',
+    [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+    ['Kaufdatum', 'SKU', 'Einheit', 'St. Frei Betrag', 'Einkauf Bemerkung',
+     'Verkaufsdatum', 'Verkaufsbetrag', 'Verkauf Bemerkung',
+     'Zu besteuernder Betrag', 'Rechnung Nr.']);
+end;
+
+
+
+
+procedure TfMain.acExportAsExcelUpdate(Sender: TObject);
+var
+  i: integer;
+begin
+  i := lvInventar.Items.Count;
+  if(i>0) then
+  begin
+    acExportAsExcel.Enabled := true;
+  end
+  else
+  begin
+    acExportAsExcel.Enabled := false;
+  end;
+end;
 
 procedure TfMain.acHinweisfensterExecute(Sender: TObject);
 var
@@ -1614,15 +1655,6 @@ end;
 
 
 
-procedure TfMain.Kundendaten1Click(Sender: TObject);
-begin
-  fKunden.show;
-end;
-
-
-
-
-
 procedure TfMain.lbAnkaufsformularClick(Sender: TObject);
 begin
   fAnkaufformular.Show;
@@ -1875,10 +1907,10 @@ begin
 
       // Nur noch nicht verkaufte Ankäufe, bereits sortiert
       Q.SQL.Text :=
-        'SELECT id, Ankaufsdatum, Ankaufswert, Karat, Gewicht ' +
+        'SELECT id, Ankaufsdatum, Ankaufswert, Artikelname, AnkaufBemerkung, Karat, Gewicht ' +
         'FROM ankaufEdelmetall ' +
         'WHERE verkaufID IS NULL ' +
-        'ORDER BY Ankaufsdatum DESC';
+        'ORDER BY Ankaufsdatum DESC, id DESC';
 
       Q.Open;
 
@@ -1902,6 +1934,9 @@ begin
           SubItems.Add('')
         else
           SubItems.Add(Int100ToDecimalString(Gewicht));
+
+        SubItems.Add(Q.FieldByName('Artikelname').AsString);
+        SubItems.Add(Q.FieldByName('AnkaufBemerkung').AsString);
 
         Item.SubItems.AddStrings(SubItems);
 
@@ -2125,6 +2160,40 @@ end;
 
 
 
+
+
+procedure TfMain.lvEdelmetallInfoTip(Sender: TObject; Item: TListItem; var InfoTip: string);
+begin
+  if Item.SubItems.Count > 5 then
+    InfoTip := Item.SubItems[5];  // zeigt z.B. das 2. SubItem
+end;
+
+procedure TfMain.lvEdelmetallSelectItem(Sender: TObject; Item: TListItem;
+  Selected: Boolean);
+begin
+  if Selected then
+  begin
+    if(trim(Item.SubItems[5]) <> '') then
+    begin
+      if(trim(Item.SubItems[6]) <> '') then
+      begin
+        StatusBar1.Panels[3].Text := Item.SubItems[5] + ' - ' + Item.SubItems[6];
+      end
+      else
+      begin
+        StatusBar1.Panels[3].Text := Item.SubItems[5];
+      end;
+    end
+    else
+    begin
+      StatusBar1.Panels[3].Text := '';
+    end;
+  end
+  else
+  begin
+    StatusBar1.Panels[3].Text := '';
+  end;
+end;
 
 
 procedure TfMain.lvEdelmetallVerkaufDblClick(Sender: TObject);
