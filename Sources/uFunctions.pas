@@ -669,15 +669,17 @@ begin
   XF := TXlsFile.Create(1, TExcelFileFormat.v2019, True);
   try
     // Tabellenblatt umbenennen
-    //XF.SetSheetName(1, 'Inventar');
+    XF.ActiveSheet := 1;
+    XF.SheetName := 'Inventar';  // Property des aktiven Sheets setzen
 
     // Header-Format: fett + grauer Hintergrund
-    //FmtHeader := XF.GetDefaultFormat;
-    //FmtHeader.Font.Style := TFlxFontStyle.Bold;
-    //FmtHeader.FillPattern.Pattern := TFlxPatternStyle.Solid;
-    //FmtHeader.FillPattern.FgColor := TExcelColor.FromArgb($D9, $D9, $D9);
-    //FmtHeader.Borders.Bottom.Style := TFlxBorderStyle.Thin;
-    //HeaderFmtIdx := XF.AddFormat(FmtHeader);
+    // Header-Format: Set of TFlxFontStyles mit [TFlxFontStyles.Bold]
+    FmtHeader := XF.GetDefaultFormat;
+    FmtHeader.Font.Style := [TFlxFontStyles.Bold];
+    FmtHeader.FillPattern.Pattern := TFlxPatternStyle.Solid;
+    FmtHeader.FillPattern.FgColor := TExcelColor.FromArgb($D9, $D9, $D9);
+    FmtHeader.Borders.Bottom.Style := TFlxBorderStyle.Thin;
+    HeaderFmtIdx := XF.AddFormat(FmtHeader);
 
     // Kopfzeile schreiben (Zeile 1)
     Row := 1;

@@ -3695,39 +3695,6 @@ object fMain: TfMain
         ExplicitHeight = 23
       end
     end
-    object pnlExportCSV: TPanel
-      Left = 513
-      Top = 12
-      Width = 148
-      Height = 41
-      Cursor = crHandPoint
-      Color = 14869218
-      Padding.Left = 10
-      Padding.Right = 10
-      ParentBackground = False
-      TabOrder = 1
-      object lbExportCSV: TLabel
-        Left = 11
-        Top = 1
-        Width = 126
-        Height = 39
-        Align = alClient
-        Alignment = taCenter
-        Caption = 'Export -> CSV'
-        Font.Charset = DEFAULT_CHARSET
-        Font.Color = clBlack
-        Font.Height = -17
-        Font.Name = 'Segoe UI'
-        Font.Style = []
-        ParentFont = False
-        Layout = tlCenter
-        OnClick = lbExportCSVClick
-        OnMouseEnter = lbExportCSVMouseEnter
-        OnMouseLeave = lbExportCSVMouseLeave
-        ExplicitWidth = 109
-        ExplicitHeight = 23
-      end
-    end
     object pnlAnkaufsformular: TPanel
       Left = 167
       Top = 12
@@ -3738,7 +3705,7 @@ object fMain: TfMain
       Padding.Left = 10
       Padding.Right = 10
       ParentBackground = False
-      TabOrder = 2
+      TabOrder = 1
       object lbAnkaufsformular: TLabel
         Left = 11
         Top = 1
@@ -3771,7 +3738,7 @@ object fMain: TfMain
       Padding.Left = 10
       Padding.Right = 10
       ParentBackground = False
-      TabOrder = 3
+      TabOrder = 2
       object lbPreisabfrage: TLabel
         Left = 11
         Top = 1

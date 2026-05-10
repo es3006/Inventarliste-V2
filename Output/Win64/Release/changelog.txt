@@ -1,7 +1,8 @@
 
 10.05.2026
-- Die Inventarliste kann jetzt als CSV oder als Excekdatei 
-  exportiert werden.
+- Die Inventarliste kann jetzt über das Menü als 
+  CSV oder als Excel-Datei exportiert werden.
+- Der Export als CSV Button wurde entfernt. 
 
 
 03.03.2026

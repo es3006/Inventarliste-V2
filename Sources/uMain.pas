@@ -67,8 +67,6 @@ type
     Sicherungerstellen2: TMenuItem;
     pnlWareneinkauf: TPanel;
     lbWareneinkauf: TLabel;
-    pnlExportCSV: TPanel;
-    lbExportCSV: TLabel;
     N1: TMenuItem;
     InventarlistealsExceldateiinDatenbankimportieren1: TMenuItem;
     pnlFortschrittsanzeige: TPanel;
@@ -145,11 +143,8 @@ type
     procedure Sicherungerstellen1Click(Sender: TObject);
     procedure Sicherungerstellen2Click(Sender: TObject);
     procedure lbWareneinkaufClick(Sender: TObject);
-    procedure lbExportCSVClick(Sender: TObject);
     procedure lbWareneinkaufMouseEnter(Sender: TObject);
     procedure lbWareneinkaufMouseLeave(Sender: TObject);
-    procedure lbExportCSVMouseEnter(Sender: TObject);
-    procedure lbExportCSVMouseLeave(Sender: TObject);
     procedure edSuchbegriffKeyPress(Sender: TObject; var Key: Char);
     procedure Beenden1Click(Sender: TObject);
     procedure InventarlistealsExceldateiinDatenbankimportieren1Click(Sender: TObject);
@@ -212,7 +207,7 @@ type
 
     procedure ImportDatenFromExcel;
     procedure ImportDatenFromCSV;
-    procedure UpdateExportPanelVisibility;
+
 
     procedure LoadSettings;
 
@@ -600,16 +595,35 @@ end;
 
 procedure TfMain.acExportAsCSVExecute(Sender: TObject);
 var
-  monatsnr: string;
+  FileName: string;
 begin
-  if(SelMonth < 10) then
-    monatsnr := '0'+IntToStr(SelMonth)
-  else
-    monatsnr := IntToStr(SelMonth);
+  if MessageDlg('ACHTUNG: ' + sLineBreak +
+       'Einträge werden  genau so exportiert wie diese in der Liste angezeigt werden, ' +
+       'also passen Sie bitte die Anzeige der Daten und die Sortierung vorher an Ihre Bedürfnisse an!' + sLineBreak + sLineBreak +
+       'Wollen Sie die Liste jetzt als CSV-Datei exportieren?',
+       mtConfirmation, [mbYes, mbNo], 0) <> mrYes then
+    Exit;
 
-  ExportListViewToCSV(lvInventar, PATHDOKUMENTE +'\'+ monatsnr + '_' + IntToStr(SelYear) + '.csv',
-  [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
-  ['Kaufdatum', 'SKU', 'Einheit', 'St. Frei Betrag', 'Einkauf Bemerkung', 'Verkaufsdatum', 'Verkaufsbetrag', 'Verkauf Bemerkung', 'Zu besteuernder Betrag', 'Rechnung Nr.']);
+  Filename := TPath.Combine(PATHDOKUMENTE, 'Inventarliste.csv');
+
+  ExportListViewToCSV(
+    lvInventar,
+    FileName,
+    [0,1,2,3,4,5,6,7,8,9],
+    ['Kaufdatum', 'SKU', 'Einheit', 'St. Frei Betrag',
+     'Einkauf Bemerkung', 'Verkaufsdatum', 'Verkaufsbetrag',
+     'Verkauf Bemerkung', 'Zu besteuernder Betrag', 'Rechnung Nr.']
+  );
+
+  // Nachfrage nach dem Export
+  if MessageDlg('Export abgeschlossen.' + sLineBreak +
+       'Möchten Sie die exportierte Datei im Datei-Explorer anzeigen?',
+       mtConfirmation, [mbYes, mbNo], 0) = mrYes then
+  begin
+    if FileExists(FileName) then
+      ShellExecute(0, 'open', 'explorer.exe', PChar('/select,"' + FileName + '"'), nil, SW_SHOWNORMAL);
+  end;
+  LoadSettings;
 end;
 
 
@@ -640,21 +654,33 @@ end;
 
 procedure TfMain.acExportAsExcelExecute(Sender: TObject);
 var
-  monatsnr: string;
+  FileName: string;
 begin
-  if (SelMonth < 10) then
-    monatsnr := '0' + IntToStr(SelMonth)
-  else
-    monatsnr := IntToStr(SelMonth);
-  ExportListViewToXLSX(lvInventar,
-    //PATHDOKUMENTE + '\' + monatsnr + '_' + IntToStr(SelYear) + '.xlsx',
-    PATHDOKUMENTE + '\Inventarliste.xlsx',
+  if MessageDlg('ACHTUNG: ' + sLineBreak +
+       'Einträge werden  genau so exportiert wie diese in der Liste angezeigt werden, ' +
+       'also passen Sie bitte die Anzeige der Daten und die Sortierung vorher an Ihre Bedürfnisse an!' + sLineBreak + sLineBreak +
+       'Wollen Sie die Liste jetzt als Excel-Datei exportieren?',
+       mtConfirmation, [mbYes, mbNo], 0) <> mrYes then
+    Exit;
+
+  Filename := TPath.Combine(PATHDOKUMENTE, 'Inventarliste.csv');
+
+  ExportListViewToXLSX(lvInventar, Filename,
     [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
     ['Kaufdatum', 'SKU', 'Einheit', 'St. Frei Betrag', 'Einkauf Bemerkung',
      'Verkaufsdatum', 'Verkaufsbetrag', 'Verkauf Bemerkung',
      'Zu besteuernder Betrag', 'Rechnung Nr.']);
-end;
 
+  // Nachfrage nach dem Export
+  if MessageDlg('Export abgeschlossen.' + sLineBreak +
+       'Möchten Sie die exportierte Datei im Datei-Explorer anzeigen?',
+       mtConfirmation, [mbYes, mbNo], 0) = mrYes then
+  begin
+    if FileExists(FileName) then
+      ShellExecute(0, 'open', 'explorer.exe', PChar('/select,"' + FileName + '"'), nil, SW_SHOWNORMAL);
+  end;
+  LoadSettings;
+end;
 
 
 
@@ -812,10 +838,6 @@ end;
 
 
 
-procedure TfMain.UpdateExportPanelVisibility;
-begin
-  pnlExportCSV.Visible := lvInventar.Items.Count > 0;
-end;
 
 
 
@@ -894,8 +916,6 @@ begin
     s := '';
 
   //LoadInventarToListViewBySuchbegriff(cbSuchfeld.Text, s);
-
-  UpdateExportPanelVisibility;
 end;
 
 
@@ -1684,58 +1704,8 @@ end;
 
 
 
-procedure TfMain.lbExportCSVClick(Sender: TObject);
-var
-  FileName: string;
-begin
-  if MessageDlg('ACHTUNG: ' + sLineBreak +
-       'Einträge werden  genau so exportiert wie diese in der Liste angezeigt werden, ' +
-       'also passen Sie bitte die Anzeige der Daten und die Sortierung vorher an Ihre Bedürfnisse an!' + sLineBreak + sLineBreak +
-       'Wollen Sie die Liste jetzt als CSV exportieren?',
-       mtConfirmation, [mbYes, mbNo], 0) <> mrYes then
-    Exit;
-
-  Filename := TPath.Combine(PATH, 'DOKUMENTE\Inventarliste.csv');
-
-  ExportListViewToCSV(
-    lvInventar,
-    FileName,
-    [0,1,2,3,4,5,6,7,8,9],
-    ['Kaufdatum', 'SKU', 'Einheit', 'St. Frei Betrag',
-     'Einkauf Bemerkung', 'Verkaufsdatum', 'Verkaufsbetrag',
-     'Verkauf Bemerkung', 'Zu besteuernder Betrag', 'Rechnung Nr.']
-  );
-
-  // Nachfrage nach dem Export
-  if MessageDlg('Export abgeschlossen.' + sLineBreak +
-       'Möchten Sie die exportierte Datei im Datei-Explorer anzeigen?',
-       mtConfirmation, [mbYes, mbNo], 0) = mrYes then
-  begin
-    if FileExists(FileName) then
-      ShellExecute(0, 'open', 'explorer.exe', PChar('/select,"' + FileName + '"'), nil, SW_SHOWNORMAL);
-  end;
-  LoadSettings;
-end;
 
 
-
-
-
-procedure TfMain.lbExportCSVMouseEnter(Sender: TObject);
-begin
-  pnlExportCSV.Left := pnlExportCSV.Left + 1;
-  pnlExportCSV.Top := pnlExportCSV.Top + 1;
-end;
-
-
-
-
-
-procedure TfMain.lbExportCSVMouseLeave(Sender: TObject);
-begin
-  pnlExportCSV.Left := pnlExportCSV.Left - 1;
-  pnlExportCSV.Top := pnlExportCSV.Top - 1;
-end;
 
 
 
@@ -2214,7 +2184,6 @@ end;
 procedure TfMain.lvInventarChange(Sender: TObject; Item: TListItem; Change: TItemChange);
 begin
   StatusBar1.Panels[1].Text := 'Einträge gesamt: ' + IntToStr(lvInventar.GetCount);
-  UpdateExportPanelVisibility;
 
   AktualisiereAndShowStatistik;
 end;
